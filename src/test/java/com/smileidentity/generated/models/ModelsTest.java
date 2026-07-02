@@ -28,8 +28,10 @@ class ModelsTest {
 
   @Test
   void consentGrantedAcceptsPreformattedTimestamp() throws Exception {
-    Consent consent = Consent.granted("2026-03-06T12:00:00.000Z", "EN", "https://example.com/privacy");
-    assertTrue(mapper.writeValueAsString(consent).contains("\"granted_at\":\"2026-03-06T12:00:00.000Z\""));
+    Consent consent =
+        Consent.granted("2026-03-06T12:00:00.000Z", "EN", "https://example.com/privacy");
+    assertTrue(
+        mapper.writeValueAsString(consent).contains("\"granted_at\":\"2026-03-06T12:00:00.000Z\""));
   }
 
   @Test
@@ -44,7 +46,11 @@ class ModelsTest {
   @Test
   void userDetailsWithPhoneSerializesToGoldenJson() throws Exception {
     UserDetails details =
-        UserDetails.builder().givenNames("John").lastName("Doe").phoneNumber("+2348012345678").build();
+        UserDetails.builder()
+            .givenNames("John")
+            .lastName("Doe")
+            .phoneNumber("+2348012345678")
+            .build();
     assertEquals(
         "{\"given_names\":\"John\",\"last_name\":\"Doe\",\"phone_number\":\"+2348012345678\"}",
         mapper.writeValueAsString(details));
@@ -146,7 +152,8 @@ class ModelsTest {
     assertEquals(2, r.getIdTypes().size());
     assertNull(r.getIdTypes().get(0).getBankCode());
     assertEquals("BVN", r.getIdTypes().get(0).getType());
-    assertEquals(Arrays.asList("first_name", "last_name", "dob"), r.getIdTypes().get(0).getRequiredFields());
+    assertEquals(
+        Arrays.asList("first_name", "last_name", "dob"), r.getIdTypes().get(0).getRequiredFields());
     assertEquals("044", r.getIdTypes().get(1).getBankCode());
   }
 
@@ -163,7 +170,9 @@ class ModelsTest {
     assertEquals("AFRICA", r.getValidDocuments().get(0).getCountry().getContinent());
     assertEquals("DRIVERS_LICENSE", r.getValidDocuments().get(0).getIdTypes().get(0).getCode());
     assertTrue(r.getValidDocuments().get(0).getIdTypes().get(0).getHasBack());
-    assertEquals(Arrays.asList("AAA00000AA00"), r.getValidDocuments().get(0).getIdTypes().get(0).getExample());
+    assertEquals(
+        Arrays.asList("AAA00000AA00"),
+        r.getValidDocuments().get(0).getIdTypes().get(0).getExample());
   }
 
   @Test
@@ -208,7 +217,8 @@ class ModelsTest {
   @Test
   void responseParsingIgnoresUnknownFields() throws Exception {
     AcceptedResponse r =
-        mapper.readValue("{\"status\":\"Accepted\",\"brand_new_field\":42}", AcceptedResponse.class);
+        mapper.readValue(
+            "{\"status\":\"Accepted\",\"brand_new_field\":42}", AcceptedResponse.class);
     assertTrue(r.isAccepted());
   }
 }

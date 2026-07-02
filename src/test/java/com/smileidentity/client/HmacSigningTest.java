@@ -65,7 +65,11 @@ class HmacSigningTest {
     server.enqueue(TestSupport.tokenResponse(jwt));
     server.enqueue(TestSupport.idStatusOk());
 
-    TestSupport.clientBuilder(server).partnerSecret(secret).build().services().idStatus("NG", "NIN");
+    TestSupport.clientBuilder(server)
+        .partnerSecret(secret)
+        .build()
+        .services()
+        .idStatus("NG", "NIN");
 
     // Both the token POST and the GET are signed when the secret is set.
     RecordedRequest tokenReq = server.takeRequest();

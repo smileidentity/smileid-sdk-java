@@ -34,7 +34,8 @@ final class TestSupport {
   /** Builds an unsigned JWT whose payload carries the given exp (epoch seconds). */
   static String jwtWithExp(long expEpochSeconds) {
     Base64.Encoder enc = Base64.getUrlEncoder().withoutPadding();
-    String header = enc.encodeToString("{\"alg\":\"HS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
+    String header =
+        enc.encodeToString("{\"alg\":\"HS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
     String payload =
         enc.encodeToString(("{\"exp\":" + expEpochSeconds + "}").getBytes(StandardCharsets.UTF_8));
     return header + "." + payload + ".sig";

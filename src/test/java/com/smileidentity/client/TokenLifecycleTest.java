@@ -56,7 +56,8 @@ class TokenLifecycleTest {
     assertTrue(names.contains("smileid-api-key"), "expected lowercase header, got " + names);
     // Telemetry on every request (§2.4).
     assertEquals("java", tokenReq.getHeader("SmileID-Source-SDK"));
-    assertEquals(com.smileidentity.Version.VERSION, tokenReq.getHeader("SmileID-Source-SDK-Version"));
+    assertEquals(
+        com.smileidentity.Version.VERSION, tokenReq.getHeader("SmileID-Source-SDK-Version"));
     assertNotNull(tokenReq.getHeader("User-Agent"));
     assertTrue(tokenReq.getHeader("User-Agent").startsWith("smileid-sdk-java/"));
 
@@ -122,7 +123,9 @@ class TokenLifecycleTest {
     String jwt2 = TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 7200);
     server.enqueue(TestSupport.tokenResponse(jwt1));
     server.enqueue(
-        TestSupport.json(401, "{\"status\":\"Unauthorized\",\"message\":\"Invalid authentication credentials.\"}"));
+        TestSupport.json(
+            401,
+            "{\"status\":\"Unauthorized\",\"message\":\"Invalid authentication credentials.\"}"));
     server.enqueue(TestSupport.tokenResponse(jwt2));
     server.enqueue(TestSupport.idStatusOk());
 

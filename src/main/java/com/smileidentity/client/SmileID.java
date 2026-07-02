@@ -162,7 +162,10 @@ public final class SmileID {
       }
       String resolvedBaseUrl = baseUrl != null ? baseUrl : environment.baseUrl();
       OkHttpClient base = httpClient != null ? httpClient : new OkHttpClient();
-      OkHttpClient configured = base.newBuilder().callTimeout(timeout).build();
+      // retryOnConnectionFailure(false): OkHttp must not transparently re-send requests —
+      // §2.6 forbids any auto-retry of non-idempotent POSTs; the transport owns all retries.
+      OkHttpClient configured =
+          base.newBuilder().callTimeout(timeout).retryOnConnectionFailure(false).build();
       Transport transport =
           new Transport(
               configured,

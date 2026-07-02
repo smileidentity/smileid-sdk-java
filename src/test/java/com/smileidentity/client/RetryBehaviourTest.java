@@ -78,7 +78,7 @@ class RetryBehaviourTest {
 
   @Test
   void idempotentGetIsRetriedOnConnectionError() throws Exception {
-    server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START));
+    server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST));
     server.enqueue(TestSupport.json(200, "{\"bank_codes\":[]}"));
 
     clientWith(new RecordingSleeper()).services().bankCodes();
@@ -188,7 +188,7 @@ class RetryBehaviourTest {
   void entryPostConnectionErrorSurfacesAsConnectionErrorWithoutRetry() throws Exception {
     server.enqueue(
         TestSupport.tokenResponse(TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 3600)));
-    server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START));
+    server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST));
     SmileID smile = clientWith(new RecordingSleeper());
 
     ConnectionException e =

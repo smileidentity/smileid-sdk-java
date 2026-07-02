@@ -17,18 +17,15 @@ final class TestSupport {
   static final String API_KEY = "fake-api-key-for-tests";
 
   static SmileID client(MockWebServer server) {
-    return SmileID.builder()
-        .partnerId(PARTNER_ID)
-        .apiKey(API_KEY)
-        .baseUrl(server.url("/").toString())
-        .build();
+    return clientBuilder(server).build();
   }
 
   static SmileID.Builder clientBuilder(MockWebServer server) {
+    // Pin to 127.0.0.1 so connection-failure tests are not affected by IPv6/IPv4 route fallback.
     return SmileID.builder()
         .partnerId(PARTNER_ID)
         .apiKey(API_KEY)
-        .baseUrl(server.url("/").toString());
+        .baseUrl("http://127.0.0.1:" + server.getPort() + "/");
   }
 
   /** Builds an unsigned JWT whose payload carries the given exp (epoch seconds). */

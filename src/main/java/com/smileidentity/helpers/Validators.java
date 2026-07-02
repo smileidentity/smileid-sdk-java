@@ -24,6 +24,13 @@ public final class Validators {
     }
   }
 
+  /** id_type is required on enhanced document verification (spec §6.3). */
+  public static void requireIdType(String idType) {
+    if (idType == null || idType.isEmpty()) {
+      throw new ValidationException("id_type is required for enhanced document verification");
+    }
+  }
+
   /** Images are required on authentication unless use_enrolled_image is true (spec §6.6). */
   public static void validateAuthenticationImages(AuthenticationParams params) {
     if (params.getUserId() == null || params.getUserId().isEmpty()) {

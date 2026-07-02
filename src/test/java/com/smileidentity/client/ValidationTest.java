@@ -9,6 +9,7 @@ import com.smileidentity.errors.InvalidRequestException;
 import com.smileidentity.errors.ValidationException;
 import com.smileidentity.generated.models.AuthenticationParams;
 import com.smileidentity.generated.models.Consent;
+import com.smileidentity.generated.models.EnhancedDocumentVerificationParams;
 import com.smileidentity.generated.models.EnhancedKycParams;
 import com.smileidentity.generated.models.EnrollParams;
 import com.smileidentity.generated.models.FraudReason;
@@ -68,6 +69,34 @@ class ValidationTest {
     assertInstanceOf(InvalidRequestException.class, e);
     assertNull(e.getStatusCode(), "local error: no HTTP status");
     assertEquals(0, server.getRequestCount(), "nothing may be sent, not even a token fetch");
+  }
+
+  @Test
+  void enhancedDocumentVerificationRequiresIdTypeBeforeSending() {
+    java.util.List<com.smileidentity.helpers.BinaryInput> liveness = new java.util.ArrayList<>();
+    for (int i = 0; i < 6; i++) {
+      liveness.add(com.smileidentity.helpers.BinaryInput.of(new byte[] {1, 2, 3}));
+    }
+    assertThrows(
+        ValidationException.class,
+        () ->
+            smile
+                .documents()
+                .verifyEnhanced(
+                    EnhancedDocumentVerificationParams.builder()
+                        .selfieImage(com.smileidentity.helpers.BinaryInput.of(new byte[] {1}))
+                        .livenessImages(liveness)
+                        .document(com.smileidentity.helpers.BinaryInput.of(new byte[] {1}))
+                        .country("NG")
+                        .userDetails(
+                            UserDetails.builder()
+                                .givenNames("John")
+                                .lastName("Doe")
+                                .email("john@example.com")
+                                .build())
+                        .consent(consent())
+                        .build()));
+    assertEquals(0, server.getRequestCount(), "id_type is enforced client-side (spec §6.3)");
   }
 
   @Test

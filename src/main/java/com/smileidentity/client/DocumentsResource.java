@@ -33,6 +33,7 @@ public final class DocumentsResource {
   public AcceptedResponse verifyEnhanced(
       EnhancedDocumentVerificationParams params, RequestOptions options) {
     Validators.requireEmailOrPhone(params.getUserDetails());
+    Validators.requireIdType(params.getIdType());
     return DocumentOperations.enhancedDocumentVerification(transport, params, options);
   }
 }

@@ -38,6 +38,8 @@ class EndToEndTest {
             .environment(Environment.SANDBOX)
             .build();
 
+    // The sandbox only accepts recognized test identities, matched on
+    // given_names + last_name + email.
     AcceptedResponse accepted =
         smile
             .enhancedKyc()
@@ -45,12 +47,12 @@ class EndToEndTest {
                 EnhancedKycParams.builder()
                     .country("NG")
                     .idType("NIN")
-                    .idNumber("00000000000")
+                    .idNumber("12345678901")
                     .userDetails(
                         UserDetails.builder()
-                            .givenNames("John")
-                            .lastName("Doe")
-                            .email("john@example.com")
+                            .givenNames("Amina Fatou")
+                            .lastName("Clearwater")
+                            .email("amina.clearwater@example.com")
                             .build())
                     .consent(Consent.granted(Instant.now(), "EN", "https://example.com/privacy"))
                     .build());

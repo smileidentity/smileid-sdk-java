@@ -253,27 +253,6 @@ class GoldenFixturesTest {
         "https://app.example.com/override", MultipartParser.single(parts, "callback_url").body);
   }
 
-  @Test
-  void kycEnhancedAliasMatchesTheSpecSample() throws Exception {
-    enqueueToken();
-    server.enqueue(TestSupport.json(202, ACCEPTED_UPPER));
-
-    AcceptedResponse accepted =
-        smile
-            .kyc()
-            .enhanced(
-                EnhancedKycParams.builder()
-                    .country("NG")
-                    .idType("NIN")
-                    .idNumber("12345678901")
-                    .userDetails(johnWithEmail())
-                    .consent(Consent.granted(Instant.now(), "EN", "https://example.com/privacy"))
-                    .build());
-    assertTrue(accepted.isAccepted());
-    server.takeRequest();
-    assertEquals("/v3/enhanced_kyc", server.takeRequest().getPath());
-  }
-
   // ---------------------------------------------------------------- 6.2 document_verification
 
   @Test

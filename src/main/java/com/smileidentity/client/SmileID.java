@@ -12,7 +12,6 @@ public final class SmileID {
 
   private final Transport transport;
   private final EnhancedKycResource enhancedKyc;
-  private final KycResource kyc;
   private final DocumentsResource documents;
   private final BiometricKycResource biometricKyc;
   private final BiometricResource biometric;
@@ -23,7 +22,6 @@ public final class SmileID {
   private SmileID(Transport transport) {
     this.transport = transport;
     this.enhancedKyc = new EnhancedKycResource(transport);
-    this.kyc = new KycResource(enhancedKyc);
     this.documents = new DocumentsResource(transport);
     this.biometricKyc = new BiometricKycResource(transport);
     this.biometric = new BiometricResource(transport);
@@ -39,11 +37,6 @@ public final class SmileID {
   /** POST /v3/enhanced_kyc. */
   public EnhancedKycResource enhancedKyc() {
     return enhancedKyc;
-  }
-
-  /** Convenience alias matching the spec §8 sample: {@code smile.kyc().enhanced(...)}. */
-  public KycResource kyc() {
-    return kyc;
   }
 
   /** Document verification endpoints. */

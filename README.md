@@ -109,8 +109,6 @@ accepted.getJobId();     // "job_..."
 accepted.isAccepted();   // true — normalizes "Accepted" and "accepted"
 ```
 
-`smile.kyc().enhanced(params)` is an equivalent alias.
-
 ### Document verification
 
 ```java

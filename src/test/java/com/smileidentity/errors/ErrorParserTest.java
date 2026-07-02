@@ -12,7 +12,8 @@ class ErrorParserTest {
 
   @Test
   void parsesStatusMessageShapeInto400InvalidRequest() {
-    String body = "{\"status\":\"Bad Request\",\"message\":\"Either email or phone_number is required.\"}";
+    String body =
+        "{\"status\":\"Bad Request\",\"message\":\"Either email or phone_number is required.\"}";
     SmileIDException e = ErrorParser.parse(400, body, null);
     assertInstanceOf(InvalidRequestException.class, e);
     assertEquals(400, e.getStatusCode());

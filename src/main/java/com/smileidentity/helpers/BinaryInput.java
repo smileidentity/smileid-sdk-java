@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.Locale;
 
 /**
  * A binary request input (selfie, liveness frame, document or comparison image). Accepts a {@link
@@ -14,11 +15,16 @@ import java.nio.file.Files;
  */
 public final class BinaryInput {
 
+  private static final byte[] PNG_SIGNATURE = {
+    (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
+  };
+
   private final File file;
   private final byte[] bytes;
   private final InputStream stream;
   private final String filename;
   private final String contentType;
+  private byte[] cachedBytes;
 
   private BinaryInput(File file, byte[] bytes, InputStream stream, String filename, String ct) {
     this.file = file;
@@ -69,13 +75,17 @@ public final class BinaryInput {
     return contentType;
   }
 
-  /** Reads the full content. Called once per request build. */
+  /** Reads the full content. Cached so detection and serialization share one read. */
   public byte[] readBytes() throws IOException {
     if (bytes != null) {
       return bytes;
     }
+    if (cachedBytes != null) {
+      return cachedBytes;
+    }
     if (file != null) {
-      return Files.readAllBytes(file.toPath());
+      cachedBytes = Files.readAllBytes(file.toPath());
+      return cachedBytes;
     }
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     byte[] buf = new byte[8192];
@@ -83,6 +93,42 @@ public final class BinaryInput {
     while ((n = stream.read(buf)) != -1) {
       out.write(buf, 0, n);
     }
-    return out.toByteArray();
+    cachedBytes = out.toByteArray();
+    return cachedBytes;
+  }
+
+  /**
+   * Content type for fields that accept JPEG or PNG (document, document_back): an explicit {@link
+   * #withContentType} wins, then PNG detection by filename extension or magic bytes, then the given
+   * fallback.
+   */
+  public String detectContentType(String fallback) {
+    if (contentType != null) {
+      return contentType;
+    }
+    if (filename != null && filename.toLowerCase(Locale.ROOT).endsWith(".png")) {
+      return "image/png";
+    }
+    try {
+      if (isPng(readBytes())) {
+        return "image/png";
+      }
+    } catch (IOException ignored) {
+      // Unreadable input surfaces later, when the request body is built.
+    }
+    return fallback;
+  }
+
+  private static boolean isPng(byte[] data) {
+    return data.length >= PNG_SIGNATURE.length && startsWith(data, PNG_SIGNATURE);
+  }
+
+  private static boolean startsWith(byte[] data, byte[] prefix) {
+    for (int i = 0; i < prefix.length; i++) {
+      if (data[i] != prefix[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 }

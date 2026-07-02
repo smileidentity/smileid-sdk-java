@@ -60,6 +60,17 @@ final class OperationSupport {
     }
   }
 
+  /**
+   * Binary part for fields accepting JPEG or PNG (document, document_back — spec §5.3.3): PNG is
+   * detected from the filename extension or magic bytes; an explicit content type still wins.
+   */
+  static void addDocumentBinary(
+      List<Part> parts, String name, BinaryInput input, String defaultFilename) {
+    if (input != null) {
+      parts.add(Part.binary(name, input, defaultFilename, input.detectContentType(IMAGE_JPEG)));
+    }
+  }
+
   /** Repeated parts, all named {@code liveness_images} — never CSV or indexed (spec §5.3.4). */
   static void addLivenessImages(List<Part> parts, List<BinaryInput> images) {
     if (images == null) {

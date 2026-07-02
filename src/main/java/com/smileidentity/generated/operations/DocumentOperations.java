@@ -25,14 +25,9 @@ public final class DocumentOperations {
     OperationSupport.addBinary(
         parts, "selfie_image", params.getSelfieImage(), "selfie.jpg", OperationSupport.IMAGE_JPEG);
     OperationSupport.addLivenessImages(parts, params.getLivenessImages());
-    OperationSupport.addBinary(
-        parts, "document", params.getDocument(), "document.jpg", OperationSupport.IMAGE_JPEG);
-    OperationSupport.addBinary(
-        parts,
-        "document_back",
-        params.getDocumentBack(),
-        "document_back.jpg",
-        OperationSupport.IMAGE_JPEG);
+    OperationSupport.addDocumentBinary(parts, "document", params.getDocument(), "document.jpg");
+    OperationSupport.addDocumentBinary(
+        parts, "document_back", params.getDocumentBack(), "document_back.jpg");
     OperationSupport.addText(parts, "country", params.getCountry());
     OperationSupport.addText(parts, "id_type", params.getIdType());
     OperationSupport.addUserDetailsAndConsent(parts, params.getUserDetails(), params.getConsent());
@@ -62,14 +57,9 @@ public final class DocumentOperations {
     OperationSupport.addBinary(
         parts, "selfie_image", params.getSelfieImage(), "selfie.jpg", OperationSupport.IMAGE_JPEG);
     OperationSupport.addLivenessImages(parts, params.getLivenessImages());
-    OperationSupport.addBinary(
-        parts, "document", params.getDocument(), "document.jpg", OperationSupport.IMAGE_JPEG);
-    OperationSupport.addBinary(
-        parts,
-        "document_back",
-        params.getDocumentBack(),
-        "document_back.jpg",
-        OperationSupport.IMAGE_JPEG);
+    OperationSupport.addDocumentBinary(parts, "document", params.getDocument(), "document.jpg");
+    OperationSupport.addDocumentBinary(
+        parts, "document_back", params.getDocumentBack(), "document_back.jpg");
     OperationSupport.addText(parts, "country", params.getCountry());
     OperationSupport.addText(parts, "id_type", params.getIdType());
     OperationSupport.addUserDetailsAndConsent(parts, params.getUserDetails(), params.getConsent());

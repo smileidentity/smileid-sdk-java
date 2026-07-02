@@ -14,6 +14,7 @@ import com.smileidentity.errors.InvalidRequestException;
 import com.smileidentity.errors.PaymentRequiredException;
 import com.smileidentity.errors.PermissionException;
 import com.smileidentity.generated.models.AcceptedResponse;
+import com.smileidentity.generated.models.AuthenticationParams;
 import com.smileidentity.generated.models.BiometricKycParams;
 import com.smileidentity.generated.models.CompareParams;
 import com.smileidentity.generated.models.ComparisonImageType;
@@ -31,7 +32,6 @@ import com.smileidentity.generated.models.ReportFraudParams;
 import com.smileidentity.generated.models.ReportUserFraudResponse;
 import com.smileidentity.generated.models.SupportedDocumentsParams;
 import com.smileidentity.generated.models.UserDetails;
-import com.smileidentity.generated.models.AuthenticationParams;
 import com.smileidentity.helpers.BinaryInput;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -90,11 +90,19 @@ class GoldenFixturesTest {
   }
 
   private static UserDetails johnWithEmail() {
-    return UserDetails.builder().givenNames("John").lastName("Doe").email("john@example.com").build();
+    return UserDetails.builder()
+        .givenNames("John")
+        .lastName("Doe")
+        .email("john@example.com")
+        .build();
   }
 
   private static UserDetails johnWithPhone() {
-    return UserDetails.builder().givenNames("John").lastName("Doe").phoneNumber("+2348012345678").build();
+    return UserDetails.builder()
+        .givenNames("John")
+        .lastName("Doe")
+        .phoneNumber("+2348012345678")
+        .build();
   }
 
   private static List<BinaryInput> livenessImages(int count) {
@@ -194,7 +202,9 @@ class GoldenFixturesTest {
   @Test
   void defaultCallbackUrlIsUsedWhenACallOmitsCallbackUrl() throws Exception {
     SmileID withDefault =
-        TestSupport.clientBuilder(server).defaultCallbackUrl("https://app.example.com/default").build();
+        TestSupport.clientBuilder(server)
+            .defaultCallbackUrl("https://app.example.com/default")
+            .build();
     enqueueToken();
     server.enqueue(TestSupport.json(202, ACCEPTED_UPPER));
 
@@ -218,7 +228,9 @@ class GoldenFixturesTest {
   @Test
   void requestOptionsCallbackUrlOverridesParamsAndDefault() throws Exception {
     SmileID withDefault =
-        TestSupport.clientBuilder(server).defaultCallbackUrl("https://app.example.com/default").build();
+        TestSupport.clientBuilder(server)
+            .defaultCallbackUrl("https://app.example.com/default")
+            .build();
     enqueueToken();
     server.enqueue(TestSupport.json(202, ACCEPTED_UPPER));
 
@@ -338,7 +350,8 @@ class GoldenFixturesTest {
                 .selfieImage(BinaryInput.of("fake-selfie".getBytes(StandardCharsets.UTF_8)))
                 .livenessImages(livenessImages(6))
                 .document(
-                    BinaryInput.of(new ByteArrayInputStream("front-png".getBytes(StandardCharsets.UTF_8)))
+                    BinaryInput.of(
+                            new ByteArrayInputStream("front-png".getBytes(StandardCharsets.UTF_8)))
                         .withContentType("image/png")
                         .withFilename("front.png"))
                 .documentBack(
@@ -610,7 +623,8 @@ class GoldenFixturesTest {
     RecordedRequest r = server.takeRequest();
     assertEquals("POST", r.getMethod());
     assertEquals("/v3/replay/job_01h2xcejqtf2nbrexx3vqjhp41", r.getPath());
-    assertTrue(r.getHeader("Content-Type").startsWith("application/json"), "replay is JSON (§6.10)");
+    assertTrue(
+        r.getHeader("Content-Type").startsWith("application/json"), "replay is JSON (§6.10)");
     assertEquals("{\"callback_url\":\"https://app.example.com/cb\"}", r.getBody().readUtf8());
     assertEquals("accepted", response.getStatus());
     assertEquals("test-user", response.getUserId());
@@ -641,7 +655,8 @@ class GoldenFixturesTest {
 
     ConflictException e =
         assertThrows(
-            ConflictException.class, () -> smile.verifications().replay("job_01h2xcejqtf2nbrexx3vqjhp41"));
+            ConflictException.class,
+            () -> smile.verifications().replay("job_01h2xcejqtf2nbrexx3vqjhp41"));
     assertEquals(409, e.getStatusCode());
     assertEquals(2, server.getRequestCount(), "409 must not be retried");
   }
@@ -653,7 +668,8 @@ class GoldenFixturesTest {
     enqueueToken();
     server.enqueue(
         TestSupport.json(
-            202, "{\"status\":\"accepted\",\"message\":\"Fraud report accepted\",\"user_id\":\"user-123\"}"));
+            202,
+            "{\"status\":\"accepted\",\"message\":\"Fraud report accepted\",\"user_id\":\"user-123\"}"));
 
     ReportUserFraudResponse response =
         smile
@@ -685,9 +701,12 @@ class GoldenFixturesTest {
     enqueueToken();
     server.enqueue(
         TestSupport.json(
-            202, "{\"status\":\"accepted\",\"message\":\"Fraud report accepted\",\"user_id\":\"user-123\"}"));
+            202,
+            "{\"status\":\"accepted\",\"message\":\"Fraud report accepted\",\"user_id\":\"user-123\"}"));
 
-    smile.users().flagFraud("user-123", FraudReason.DOCUMENT_FORGERY, null, "fraud-team@example.com");
+    smile
+        .users()
+        .flagFraud("user-123", FraudReason.DOCUMENT_FORGERY, null, "fraud-team@example.com");
 
     server.takeRequest();
     List<TestPart> parts = MultipartParser.parse(server.takeRequest());
@@ -701,7 +720,8 @@ class GoldenFixturesTest {
     enqueueToken();
     server.enqueue(
         TestSupport.json(
-            202, "{\"status\":\"accepted\",\"message\":\"Fraud report accepted\",\"user_id\":\"user-123\"}"));
+            202,
+            "{\"status\":\"accepted\",\"message\":\"Fraud report accepted\",\"user_id\":\"user-123\"}"));
 
     smile.users().clearFraud("user-123", "False positive after review", "fraud-team@example.com");
 
@@ -750,7 +770,8 @@ class GoldenFixturesTest {
   @Test
   void servicesErrorCodeShapeRaisesPermissionErrorWithCode() throws Exception {
     server.enqueue(
-        TestSupport.json(403, "{\"error\":\"You are not authorized to do that.\",\"code\":\"2413\"}"));
+        TestSupport.json(
+            403, "{\"error\":\"You are not authorized to do that.\",\"code\":\"2413\"}"));
     PermissionException e =
         assertThrows(PermissionException.class, () -> smile.services().bankCodes());
     assertEquals(403, e.getStatusCode());
@@ -762,7 +783,8 @@ class GoldenFixturesTest {
   void idStatusReorderedErrorShapeRaisesInvalidRequest() throws Exception {
     enqueueToken();
     server.enqueue(
-        TestSupport.json(400, "{\"message\":\"\\\"country\\\" is required\",\"status\":\"Bad Request\"}"));
+        TestSupport.json(
+            400, "{\"message\":\"\\\"country\\\" is required\",\"status\":\"Bad Request\"}"));
     InvalidRequestException e =
         assertThrows(InvalidRequestException.class, () -> smile.services().idStatus("", "NIN"));
     assertEquals("\"country\" is required", e.getMessage());
@@ -773,7 +795,8 @@ class GoldenFixturesTest {
   void entry402RaisesPaymentRequired() throws Exception {
     enqueueToken();
     server.enqueue(
-        TestSupport.json(402, "{\"status\":\"Payment Required\",\"message\":\"Insufficient wallet balance.\"}"));
+        TestSupport.json(
+            402, "{\"status\":\"Payment Required\",\"message\":\"Insufficient wallet balance.\"}"));
     PaymentRequiredException e =
         assertThrows(
             PaymentRequiredException.class,

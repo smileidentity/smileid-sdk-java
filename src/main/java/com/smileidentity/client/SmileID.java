@@ -5,20 +5,70 @@ import okhttp3.OkHttpClient;
 
 /**
  * The Smile ID client (spec §2.1). Construct with {@code SmileID.builder()} and reach every
- * operation through a resource namespace, e.g. {@code smile.services().bankCodes()}.
+ * operation through a resource namespace, e.g. {@code smile.enhancedKyc().verify(...)} or {@code
+ * smile.services().bankCodes()}.
  */
 public final class SmileID {
 
   private final Transport transport;
+  private final EnhancedKycResource enhancedKyc;
+  private final KycResource kyc;
+  private final DocumentsResource documents;
+  private final BiometricKycResource biometricKyc;
+  private final BiometricResource biometric;
+  private final VerificationsResource verifications;
+  private final UsersResource users;
   private final ServicesResource services;
 
   private SmileID(Transport transport) {
     this.transport = transport;
+    this.enhancedKyc = new EnhancedKycResource(transport);
+    this.kyc = new KycResource(enhancedKyc);
+    this.documents = new DocumentsResource(transport);
+    this.biometricKyc = new BiometricKycResource(transport);
+    this.biometric = new BiometricResource(transport);
+    this.verifications = new VerificationsResource(transport);
+    this.users = new UsersResource(transport);
     this.services = new ServicesResource(transport);
   }
 
   public static Builder builder() {
     return new Builder();
+  }
+
+  /** POST /v3/enhanced_kyc. */
+  public EnhancedKycResource enhancedKyc() {
+    return enhancedKyc;
+  }
+
+  /** Convenience alias matching the spec §8 sample: {@code smile.kyc().enhanced(...)}. */
+  public KycResource kyc() {
+    return kyc;
+  }
+
+  /** Document verification endpoints. */
+  public DocumentsResource documents() {
+    return documents;
+  }
+
+  /** POST /v3/biometric_kyc. */
+  public BiometricKycResource biometricKyc() {
+    return biometricKyc;
+  }
+
+  /** Biometric enrollment, authentication and compare. */
+  public BiometricResource biometric() {
+    return biometric;
+  }
+
+  /** Job status, polling and callback replay. */
+  public VerificationsResource verifications() {
+    return verifications;
+  }
+
+  /** Fraud reporting. */
+  public UsersResource users() {
+    return users;
   }
 
   /** The /v3/services endpoints. */

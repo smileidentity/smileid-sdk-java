@@ -8,18 +8,21 @@ The API surface (endpoints, request and response shapes) comes from the OpenAPI 
 
 ## Layout
 
-- `src/main/java/com/smileidentity/generated/` — will hold generator-owned code once the client generator lands. Do not hand-edit files here once that exists.
-- `src/main/java/com/smileidentity/client/` — hand-written client code that wraps the generated layer.
-- `src/main/java/com/smileidentity/errors/` — hand-written error types.
-- `src/main/java/com/smileidentity/helpers/` — hand-written helper utilities.
+- `src/main/java/com/smileidentity/generated/` — wire models and thin per-operation functions. A client generator will own this tree later; keep it free of hand-written business logic and expect it to be regenerated wholesale.
+- `src/main/java/com/smileidentity/client/` — hand-written client code: `SmileID` (builder plus config), the transport (headers, auth, retries, multipart serialization) and the resource namespaces.
+- `src/main/java/com/smileidentity/errors/` — hand-written error types and the error-body parser.
+- `src/main/java/com/smileidentity/helpers/` — hand-written helpers: `BinaryInput`, validators, and the `waitUntilComplete` polling helper.
 
-At this stage the repository is a scaffold, so most of these directories don't exist yet. They'll be created as the corresponding code is added.
+Public method and parameter names are camelCase; wire field names are always verbatim snake_case, mapped with Jackson `@JsonProperty` at the serialization boundary. Never rename a wire field.
 
 ## Running tests
 
 ```bash
-./gradlew test
+./gradlew build   # compiles, runs tests and checks formatting (Spotless)
+./gradlew test    # tests only
 ```
+
+Tests are offline and use OkHttp MockWebServer. The end-to-end sandbox test (`EndToEndTest`) skips unless `SMILE_PARTNER_ID` and `SMILE_API_KEY` are set in the environment.
 
 ## Org-wide agent conventions
 

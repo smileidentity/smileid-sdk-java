@@ -1,1 +1,1 @@
-rootProject.name = "smile-identity-core"
+rootProject.name = "smileid"

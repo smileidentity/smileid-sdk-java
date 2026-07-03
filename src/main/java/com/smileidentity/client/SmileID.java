@@ -1,6 +1,8 @@
 package com.smileidentity.client;
 
+import com.smileidentity.helpers.Validators;
 import java.time.Duration;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 
 /**
@@ -153,7 +155,8 @@ public final class SmileID {
       if (timeout == null || timeout.isNegative() || timeout.isZero()) {
         throw new IllegalArgumentException("timeout must be positive");
       }
-      String resolvedBaseUrl = baseUrl != null ? baseUrl : environment.baseUrl();
+      String resolvedBaseUrl = validateBaseUrl(baseUrl != null ? baseUrl : environment.baseUrl());
+      Validators.requireHttpsCallbackUrl(defaultCallbackUrl, "defaultCallbackUrl");
       OkHttpClient base = httpClient != null ? httpClient : new OkHttpClient();
       // retryOnConnectionFailure(false): OkHttp must not transparently re-send requests —
       // §2.6 forbids any auto-retry of non-idempotent POSTs; the transport owns all retries.
@@ -169,6 +172,24 @@ public final class SmileID {
               defaultCallbackUrl,
               maxRetries);
       return new SmileID(transport);
+    }
+
+    /**
+     * base_url must be an absolute https URL with no query or fragment (fleet standard,
+     * 2026-07-03). Deliberately stricter than spec §2.1; no insecure escape hatch.
+     */
+    private static String validateBaseUrl(String value) {
+      HttpUrl parsed = value == null ? null : HttpUrl.parse(value);
+      if (parsed == null) {
+        throw new IllegalArgumentException("baseUrl must be an absolute https URL");
+      }
+      if (!"https".equals(parsed.scheme())) {
+        throw new IllegalArgumentException("baseUrl must use https");
+      }
+      if (parsed.query() != null || parsed.fragment() != null) {
+        throw new IllegalArgumentException("baseUrl must not include a query or fragment");
+      }
+      return value;
     }
   }
 }

@@ -6,6 +6,7 @@ import com.smileidentity.client.Transport;
 import com.smileidentity.generated.models.JobStatus;
 import com.smileidentity.generated.models.ReplayCallbackResponse;
 import com.smileidentity.generated.models.ReplayParams;
+import com.smileidentity.helpers.Validators;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -21,7 +22,7 @@ public final class VerificationOperations {
     ApiRequest request =
         ApiRequest.builder()
             .method("GET")
-            .path("/v3/status/" + jobId)
+            .path("/v3/status/" + OperationSupport.encodePathSegment(jobId))
             .authenticated(true)
             .idempotent(true)
             .notFoundReturnsBody(true)
@@ -34,12 +35,13 @@ public final class VerificationOperations {
       Transport transport, String jobId, ReplayParams params, RequestOptions options) {
     Map<String, String> body = new LinkedHashMap<>();
     if (params != null && params.getCallbackUrl() != null) {
+      Validators.requireHttpsCallbackUrl(params.getCallbackUrl(), "callbackUrl");
       body.put("callback_url", params.getCallbackUrl());
     }
     ApiRequest request =
         ApiRequest.builder()
             .method("POST")
-            .path("/v3/replay/" + jobId)
+            .path("/v3/replay/" + OperationSupport.encodePathSegment(jobId))
             .authenticated(true)
             .jsonBody(body)
             .options(options)

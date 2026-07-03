@@ -70,8 +70,7 @@ class GoldenFixturesTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    server = new MockWebServer();
-    server.start();
+    server = TestSupport.tlsServer();
     smile = TestSupport.client(server);
   }
 

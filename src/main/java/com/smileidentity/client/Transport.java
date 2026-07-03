@@ -1,9 +1,12 @@
 package com.smileidentity.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smileidentity.Version;
 import com.smileidentity.errors.ConnectionException;
 import com.smileidentity.errors.ErrorParser;
+import com.smileidentity.errors.UnexpectedResponseException;
+import com.smileidentity.errors.ValidationException;
 import com.smileidentity.generated.models.TokenResponse;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -153,13 +156,21 @@ public final class Transport {
   private <T> T parseResponse(
       ApiRequest req, int status, String body, String requestId, Class<T> responseType) {
     if (status >= 200 && status < 300 || (status == 404 && req.isNotFoundReturnsBody())) {
-      if (responseType == Void.class || body == null || body.isEmpty()) {
-        return null;
-      }
+      // A success-path body must be a JSON object (fleet standard, 2026-07-03).
       try {
-        return mapper.readValue(body, responseType);
+        JsonNode node = body == null || body.isEmpty() ? null : mapper.readTree(body);
+        if (node == null || !node.isObject()) {
+          throw new UnexpectedResponseException(
+              "Expected a JSON object response body but got: "
+                  + (body == null || body.isEmpty() ? "an empty body" : "a non-object body"),
+              status,
+              requestId,
+              body);
+        }
+        return mapper.treeToValue(node, responseType);
       } catch (IOException e) {
-        throw new ConnectionException("Could not parse response body: " + e.getMessage(), e);
+        throw new UnexpectedResponseException(
+            "Expected a JSON object response body: " + e.getMessage(), status, requestId, body);
       }
     }
     throw ErrorParser.parse(status, body, requestId);
@@ -231,8 +242,16 @@ public final class Transport {
               part.getBinary().getContentType() != null
                   ? part.getBinary().getContentType()
                   : part.getDefaultContentType();
-          mb.addFormDataPart(
-              part.getName(), filename, RequestBody.create(bytes, MediaType.get(contentType)));
+          MediaType mediaType;
+          try {
+            mediaType = MediaType.get(contentType);
+          } catch (IllegalArgumentException e) {
+            // Header-injection hardening: a caller-supplied content type that is not a valid
+            // media type (e.g. contains CR/LF) must never reach the wire.
+            throw new ValidationException(
+                "Invalid content type for part " + part.getName() + ": " + e.getMessage());
+          }
+          mb.addFormDataPart(part.getName(), filename, RequestBody.create(bytes, mediaType));
           break;
       }
     }
@@ -242,9 +261,11 @@ public final class Transport {
   private HttpUrl buildUrl(ApiRequest req) {
     HttpUrl base = HttpUrl.get(baseUrl);
     HttpUrl.Builder ub = base.newBuilder();
+    // Paths arrive pre-encoded: operations percent-encode path params as single segments
+    // (fleet standard, 2026-07-03), so segments must not be encoded a second time here.
     for (String segment : req.getPath().split("/")) {
       if (!segment.isEmpty()) {
-        ub.addPathSegment(segment);
+        ub.addEncodedPathSegment(segment);
       }
     }
     for (Map.Entry<String, String> q : req.getQuery().entrySet()) {

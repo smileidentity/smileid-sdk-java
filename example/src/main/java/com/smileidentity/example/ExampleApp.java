@@ -87,7 +87,6 @@ public final class ExampleApp {
             .partnerId(config.get("partnerId"))
             .apiKey(config.get("apiKey"))
             .timeout(Duration.ofMillis(timeoutMs));
-    if (present(config.get("partnerSecret"))) builder.partnerSecret(config.get("partnerSecret"));
     if (present(config.get("baseUrl"))) builder.baseUrl(config.get("baseUrl"));
     if (present(config.get("callbackUrl"))) builder.defaultCallbackUrl(config.get("callbackUrl"));
     if (httpClient != null) builder.httpClient(httpClient);
@@ -171,7 +170,6 @@ public final class ExampleApp {
     Map<String, String> config = new LinkedHashMap<>();
     config.put("partnerId", env.getOrDefault("SMILE_PARTNER_ID", ""));
     config.put("apiKey", env.getOrDefault("SMILE_API_KEY", ""));
-    config.put("partnerSecret", env.get("SMILE_PARTNER_SECRET"));
     config.put("baseUrl", env.get("SMILE_BASE_URL"));
     config.put("callbackUrl", env.get("SMILE_CALLBACK_URL"));
     config.put("timeoutMs", env.getOrDefault("SMILE_TIMEOUT_MS", "30000"));
@@ -191,9 +189,6 @@ public final class ExampleApp {
           break;
         case "--api-key":
           config.put("apiKey", value);
-          break;
-        case "--partner-secret":
-          config.put("partnerSecret", value);
           break;
         case "--base-url":
           config.put("baseUrl", value);
@@ -249,7 +244,7 @@ public final class ExampleApp {
         + "  smileid-example-java [global flags] enhanced-kyc --country NG --id-type NIN --id-number 12345678901 --given-names Amina --last-name Okafor --email amina@example.com --privacy-url https://example.com/privacy\n"
         + "  smileid-example-java [global flags] status --job-id job_...\n"
         + "  smileid-example-java [global flags] replay --job-id job_... --callback-url https://example.com/webhook\n\n"
-        + "Global flags can also be set with SMILE_PARTNER_ID, SMILE_API_KEY, SMILE_PARTNER_SECRET, SMILE_BASE_URL, SMILE_CALLBACK_URL and SMILE_TIMEOUT_MS.\n";
+        + "Global flags can also be set with SMILE_PARTNER_ID, SMILE_API_KEY, SMILE_BASE_URL, SMILE_CALLBACK_URL and SMILE_TIMEOUT_MS.\n";
   }
 
   private static final class Parsed {

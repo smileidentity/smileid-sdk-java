@@ -1,6 +1,6 @@
 # Smile ID Java SDK
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.smileidentity/smile-identity-core?label=Maven%20Central)](https://central.sonatype.com/artifact/com.smileidentity/smile-identity-core)
+[![Maven Central](https://img.shields.io/maven-central/v/com.smileidentity/smileid?label=Maven%20Central)](https://central.sonatype.com/artifact/com.smileidentity/smileid)
 [![CI](https://img.shields.io/github/actions/workflow/status/smileidentity/smileid-sdk-java/test.yml?branch=main&label=CI)](https://github.com/smileidentity/smileid-sdk-java/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/smileidentity/smileid-sdk-java)](LICENSE)
 
@@ -9,7 +9,7 @@ Official Smile ID server-side SDK for Java — V3 APIs.
 This repository is under active development. The SDK is not yet published, and the API surface may change without notice.
 
 - Group: `com.smileidentity`
-- Artifact: `smile-identity-core`
+- Artifact: `smileid`
 - Requires Java 11 or later
 
 ## Install
@@ -19,7 +19,7 @@ Not yet published to Maven Central. Once published:
 Gradle:
 
 ```kotlin
-implementation("com.smileidentity:smile-identity-core:0.1.0")
+implementation("com.smileidentity:smileid:12.0.0")
 ```
 
 Maven:
@@ -27,8 +27,8 @@ Maven:
 ```xml
 <dependency>
   <groupId>com.smileidentity</groupId>
-  <artifactId>smile-identity-core</artifactId>
-  <version>0.1.0</version>
+  <artifactId>smileid</artifactId>
+  <version>12.0.0</version>
 </dependency>
 ```
 

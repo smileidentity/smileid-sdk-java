@@ -56,10 +56,9 @@ class TokenLifecycleTest {
     assertTrue(names.contains("smileid-api-key"), "expected lowercase header, got " + names);
     // Telemetry on every request (§2.4).
     assertEquals("java", tokenReq.getHeader("SmileID-Source-SDK"));
-    assertEquals(
-        com.smileidentity.Version.VERSION, tokenReq.getHeader("SmileID-Source-SDK-Version"));
+    assertEquals("12.0.0", tokenReq.getHeader("SmileID-Source-SDK-Version"));
     assertNotNull(tokenReq.getHeader("User-Agent"));
-    assertTrue(tokenReq.getHeader("User-Agent").startsWith("smileid-sdk-java/"));
+    assertTrue(tokenReq.getHeader("User-Agent").startsWith("smileid-sdk-java/12.0.0 ("));
 
     RecordedRequest statusReq = server.takeRequest();
     assertEquals(jwt, statusReq.getHeader("SmileID-Token"));

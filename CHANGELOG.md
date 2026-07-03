@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed the Maven artifact from `smile-identity-core` to `smileid`; the
+  coordinates are now `com.smileidentity:smileid`. The `com.smileidentity`
+  package namespace is unchanged.
+- Set the version to 12.0.0 to align the server SDKs with the V12 mobile SDKs.
+
 ### Added
 
 - Initial implementation of the V3 server-side SDK: all 14 public operations

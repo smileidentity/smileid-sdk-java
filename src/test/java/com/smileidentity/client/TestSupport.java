@@ -1,20 +1,57 @@
 package com.smileidentity.client;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 
-/** Shared helpers for MockWebServer-backed tests. */
+/** Shared helpers for MockWebServer-backed tests. All mock traffic runs over TLS. */
 final class TestSupport {
 
   private TestSupport() {}
 
   static final String PARTNER_ID = "1234";
   static final String API_KEY = "fake-api-key-for-tests";
+
+  private static final HeldCertificate LOCALHOST_CERTIFICATE =
+      new HeldCertificate.Builder()
+          .commonName("localhost")
+          .addSubjectAlternativeName("localhost")
+          .addSubjectAlternativeName("127.0.0.1")
+          .build();
+  private static final HandshakeCertificates SERVER_CERTIFICATES =
+      new HandshakeCertificates.Builder().heldCertificate(LOCALHOST_CERTIFICATE).build();
+  private static final HandshakeCertificates CLIENT_CERTIFICATES =
+      new HandshakeCertificates.Builder()
+          .addTrustedCertificate(LOCALHOST_CERTIFICATE.certificate())
+          .build();
+
+  /** A started MockWebServer serving https with a self-signed localhost certificate. */
+  static MockWebServer tlsServer() throws IOException {
+    MockWebServer server = new MockWebServer();
+    server.useHttps(SERVER_CERTIFICATES.sslSocketFactory(), false);
+    server.start();
+    return server;
+  }
+
+  /**
+   * An OkHttp client that trusts the test certificate; injected via the builder. Pinned to HTTP/1.1
+   * so exact header-name casing stays observable on the wire (HTTP/2 lowercases all header names).
+   */
+  static OkHttpClient trustingHttpClient() {
+    return new OkHttpClient.Builder()
+        .sslSocketFactory(
+            CLIENT_CERTIFICATES.sslSocketFactory(), CLIENT_CERTIFICATES.trustManager())
+        .protocols(java.util.Collections.singletonList(okhttp3.Protocol.HTTP_1_1))
+        .build();
+  }
 
   static SmileID client(MockWebServer server) {
     return clientBuilder(server).build();
@@ -25,7 +62,8 @@ final class TestSupport {
     return SmileID.builder()
         .partnerId(PARTNER_ID)
         .apiKey(API_KEY)
-        .baseUrl("http://127.0.0.1:" + server.getPort() + "/");
+        .httpClient(trustingHttpClient())
+        .baseUrl("https://127.0.0.1:" + server.getPort() + "/");
   }
 
   /** Builds an unsigned JWT whose payload carries the given exp (epoch seconds). */

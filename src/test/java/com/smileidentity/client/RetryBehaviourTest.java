@@ -37,8 +37,7 @@ class RetryBehaviourTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    server = new MockWebServer();
-    server.start();
+    server = TestSupport.tlsServer();
   }
 
   @AfterEach

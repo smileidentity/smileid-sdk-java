@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import okhttp3.OkHttpClient;
 
 public final class ExampleApp {
@@ -72,11 +73,20 @@ public final class ExampleApp {
   }
 
   private SmileID client(Map<String, String> config) {
+    long timeoutMs;
+    try {
+      timeoutMs = Long.parseLong(config.get("timeoutMs"));
+    } catch (NumberFormatException e) {
+      throw new UsageException("--timeout-ms must be a positive integer number of milliseconds");
+    }
+    if (timeoutMs <= 0) {
+      throw new UsageException("--timeout-ms must be a positive integer number of milliseconds");
+    }
     SmileID.Builder builder =
         SmileID.builder()
             .partnerId(config.get("partnerId"))
             .apiKey(config.get("apiKey"))
-            .timeout(Duration.ofMillis(Long.parseLong(config.get("timeoutMs"))));
+            .timeout(Duration.ofMillis(timeoutMs));
     if (present(config.get("partnerSecret"))) builder.partnerSecret(config.get("partnerSecret"));
     if (present(config.get("baseUrl"))) builder.baseUrl(config.get("baseUrl"));
     if (present(config.get("callbackUrl"))) builder.defaultCallbackUrl(config.get("callbackUrl"));
@@ -86,14 +96,14 @@ public final class ExampleApp {
 
   private void services(SmileID smile, String[] args) throws Exception {
     String country = flag(args, "--country", "NG");
+    var services = smile.services();
     Map<String, Object> out = new LinkedHashMap<>();
     out.put("country", country);
-    out.put("bank_codes", smile.services().bankCodes(country).getBankCodes());
-    out.put("id_types", smile.services().supportedIdTypes(country).getIdTypes());
+    out.put("bank_codes", services.bankCodes(country).getBankCodes());
+    out.put("id_types", services.supportedIdTypes(country).getIdTypes());
     out.put(
         "documents",
-        smile
-            .services()
+        services
             .supportedDocuments(SupportedDocumentsParams.builder().countryCode(country).build())
             .getValidDocuments());
     write(out);
@@ -167,8 +177,15 @@ public final class ExampleApp {
     config.put("timeoutMs", env.getOrDefault("SMILE_TIMEOUT_MS", "30000"));
     int i = 0;
     while (i < argv.length && argv[i].startsWith("--")) {
-      String value = i + 1 < argv.length ? argv[++i] : "";
-      switch (argv[i - 1]) {
+      String flag = argv[i];
+      if (Objects.equals(flag, "--help") || Objects.equals(flag, "-h")) {
+        break;
+      }
+      if (i + 1 >= argv.length) {
+        throw new UsageException(flag + " requires a value");
+      }
+      String value = argv[++i];
+      switch (flag) {
         case "--partner-id":
           config.put("partnerId", value);
           break;
@@ -188,7 +205,7 @@ public final class ExampleApp {
           config.put("timeoutMs", value);
           break;
         default:
-          throw new UsageException("unknown global flag " + argv[i - 1]);
+          throw new UsageException("unknown global flag " + flag);
       }
       i++;
     }

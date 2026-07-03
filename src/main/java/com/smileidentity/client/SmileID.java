@@ -80,7 +80,6 @@ public final class SmileID {
     private String partnerId;
     private String apiKey;
     private Environment environment = Environment.SANDBOX;
-    private String partnerSecret;
     private String defaultCallbackUrl;
     private String baseUrl;
     private Duration timeout = Duration.ofSeconds(30);
@@ -102,12 +101,6 @@ public final class SmileID {
     /** Sandbox by default. */
     public Builder environment(Environment environment) {
       this.environment = environment;
-      return this;
-    }
-
-    /** Enables HMAC request signing when set (spec §2.5). OFF when unset. */
-    public Builder partnerSecret(String partnerSecret) {
-      this.partnerSecret = partnerSecret;
       return this;
     }
 
@@ -164,13 +157,7 @@ public final class SmileID {
           base.newBuilder().callTimeout(timeout).retryOnConnectionFailure(false).build();
       Transport transport =
           new Transport(
-              configured,
-              resolvedBaseUrl,
-              partnerId,
-              apiKey,
-              partnerSecret,
-              defaultCallbackUrl,
-              maxRetries);
+              configured, resolvedBaseUrl, partnerId, apiKey, defaultCallbackUrl, maxRetries);
       return new SmileID(transport);
     }
 

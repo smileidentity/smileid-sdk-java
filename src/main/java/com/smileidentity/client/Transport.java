@@ -22,9 +22,9 @@ import okhttp3.Response;
 import okio.Buffer;
 
 /**
- * The single transport (spec §2.2). Builds the URL, attaches auth and telemetry headers, optionally
- * signs, serializes the body, sends with the §2.6 retry policy, refreshes the token once on 401,
- * and parses the response or raises a typed error.
+ * The single transport (spec §2.2). Builds the URL, attaches auth and telemetry headers, serializes
+ * the body, sends with the §2.6 retry policy, refreshes the token once on 401, and parses the
+ * response or raises a typed error.
  */
 public final class Transport {
 
@@ -44,7 +44,6 @@ public final class Transport {
   private final int maxRetries;
   private final ObjectMapper mapper = Json.mapper();
   private final TokenProvider tokenProvider;
-  private final HmacSigner signer;
 
   private Sleeper sleeper = Sleeper.DEFAULT;
 
@@ -53,7 +52,6 @@ public final class Transport {
       String baseUrl,
       String partnerId,
       String apiKey,
-      String partnerSecret,
       String defaultCallbackUrl,
       int maxRetries) {
     this.http = http;
@@ -62,7 +60,6 @@ public final class Transport {
     this.apiKey = apiKey;
     this.defaultCallbackUrl = defaultCallbackUrl;
     this.maxRetries = maxRetries;
-    this.signer = new HmacSigner(partnerSecret);
     this.tokenProvider = new TokenProvider(this::fetchToken);
   }
 
@@ -194,11 +191,6 @@ public final class Transport {
     }
     if (req.getUserIdHeader() != null) {
       rb.header("User-ID", req.getUserIdHeader());
-    }
-    if (signer.isEnabled()) {
-      String[] timestampAndSignature = signer.sign(bodyBytes);
-      rb.header("SmileID-Timestamp", timestampAndSignature[0]);
-      rb.header("SmileID-Request-Signature", timestampAndSignature[1]);
     }
     RequestBody body = bodyBytes == null ? null : RequestBody.create(bodyBytes, bodyType);
     rb.method(req.getMethod(), body);

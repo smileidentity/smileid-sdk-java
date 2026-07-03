@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Request signing: the `partnerSecret` option and the signing headers are
+  gone. Product decision: request signing confused partners for little
+  benefit; it may be reintroduced if a signing contract is agreed with the
+  backend.
+
 ### Security
 
 - `baseUrl` must now be an absolute https URL with no query or fragment; the
@@ -41,4 +48,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Retry policy for idempotent operations only, honouring `Retry-After`.
 - Typed error hierarchy under `com.smileidentity.errors`.
 - `verifications().waitUntilComplete(...)` polling helper.
-- Optional HMAC request signing, off unless a partner secret is configured.

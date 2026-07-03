@@ -11,7 +11,7 @@ import java.util.Locale;
 /**
  * A binary request input (selfie, liveness frame, document or comparison image). Accepts a {@link
  * File}, a {@code byte[]} or an {@link InputStream} (spec §5.3/§8). Streams are read fully when the
- * request is built so requests stay repeatable for signing and 401 refresh.
+ * request is built so requests stay repeatable for the single 401 token refresh.
  */
 public final class BinaryInput {
 

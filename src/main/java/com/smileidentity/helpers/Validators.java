@@ -5,6 +5,7 @@ import com.smileidentity.generated.models.AuthenticationParams;
 import com.smileidentity.generated.models.FraudReason;
 import com.smileidentity.generated.models.ReportFraudParams;
 import com.smileidentity.generated.models.UserDetails;
+import okhttp3.HttpUrl;
 
 /** Client-side validation raised before any request is sent (spec §5.1, §6.6, §6.11). */
 public final class Validators {
@@ -21,6 +22,21 @@ public final class Validators {
         userDetails.getPhoneNumber() != null && !userDetails.getPhoneNumber().isEmpty();
     if (!hasEmail && !hasPhone) {
       throw new ValidationException("user_details requires at least one of email or phone_number");
+    }
+  }
+
+  /**
+   * Callback URLs must be absolute https URLs (fleet standard, 2026-07-03). Applied to
+   * defaultCallbackUrl at construction and to the effective per-request callback URL before any
+   * request is sent. Null (absent) is allowed — callbacks are optional.
+   */
+  public static void requireHttpsCallbackUrl(String url, String fieldName) {
+    if (url == null) {
+      return;
+    }
+    HttpUrl parsed = HttpUrl.parse(url);
+    if (parsed == null || !"https".equals(parsed.scheme())) {
+      throw new ValidationException(fieldName + " must be an absolute https URL");
     }
   }
 

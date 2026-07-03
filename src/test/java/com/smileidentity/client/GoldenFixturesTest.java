@@ -794,44 +794,6 @@ class GoldenFixturesTest {
     assertEquals("Insufficient wallet balance.", e.getMessage());
   }
 
-  // ---------------------------------------------------------------- §2.5 over multipart
-
-  @Test
-  void hmacSignatureCoversTheExactMultipartBytes() throws Exception {
-    SmileID signed = TestSupport.clientBuilder(server).partnerSecret("test-partner-secret").build();
-    enqueueToken();
-    server.enqueue(TestSupport.json(202, ACCEPTED_UPPER));
-
-    signed
-        .enhancedKyc()
-        .verify(
-            EnhancedKycParams.builder()
-                .country("NG")
-                .idType("NIN")
-                .idNumber("12345678901")
-                .userDetails(johnWithEmail())
-                .consent(goldenConsent())
-                .build());
-
-    server.takeRequest();
-    RecordedRequest r = server.takeRequest();
-    String ts = r.getHeader("SmileID-Timestamp");
-    String sig = r.getHeader("SmileID-Request-Signature");
-    assertNotNull(ts);
-    assertNotNull(sig);
-    javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
-    mac.init(
-        new javax.crypto.spec.SecretKeySpec(
-            "test-partner-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-    mac.update(ts.getBytes(StandardCharsets.UTF_8));
-    mac.update(r.getBody().readByteArray());
-    StringBuilder hex = new StringBuilder();
-    for (byte b : mac.doFinal()) {
-      hex.append(String.format("%02x", b));
-    }
-    assertEquals(hex.toString(), sig);
-  }
-
   private static String baseType(String contentType) {
     if (contentType == null) {
       return null;

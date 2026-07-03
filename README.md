@@ -57,7 +57,6 @@ Configuration options:
 | `partnerId` | required | Numeric string, no leading zeros |
 | `apiKey` | required | Partner API key |
 | `environment` | `SANDBOX` | `SANDBOX` or `PRODUCTION` |
-| `partnerSecret` | unset | Enables HMAC request signing when set (see below) |
 | `defaultCallbackUrl` | unset | Used when a call omits `callbackUrl`; must be https |
 | `baseUrl` | derived | Explicit override; wins over `environment`; must be https |
 | `timeout` | 30 seconds | Per-request total timeout |
@@ -327,10 +326,6 @@ Retries: idempotent operations (status and services reads, plus the internal tok
 ## Telemetry
 
 Every request carries `SmileID-Source-SDK: java`, `SmileID-Source-SDK-Version` and a `User-Agent` string identifying the SDK and Java runtime versions. These headers are observability metadata only; they are never used for authentication.
-
-## Request signing (HMAC)
-
-Off by default. Setting `partnerSecret` on the builder enables signing: each request gains `SmileID-Timestamp` and `SmileID-Request-Signature` headers computed over the exact serialized request body. The exact signature construction is provisional and must be confirmed with Smile ID before relying on it in production.
 
 ## Contributing
 

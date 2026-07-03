@@ -41,4 +41,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Retry policy for idempotent operations only, honouring `Retry-After`.
 - Typed error hierarchy under `com.smileidentity.errors`.
 - `verifications().waitUntilComplete(...)` polling helper.
-- Optional HMAC request signing, off unless a partner secret is configured.

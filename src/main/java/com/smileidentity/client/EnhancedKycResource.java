@@ -19,7 +19,7 @@ public final class EnhancedKycResource {
   }
 
   public AcceptedResponse verify(EnhancedKycParams params, RequestOptions options) {
-    Validators.requireEmailOrPhone(params.getUserDetails());
+    Validators.validateEnhancedKyc(params);
     return KycOperations.enhancedKyc(transport, params, options);
   }
 }

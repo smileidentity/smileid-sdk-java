@@ -61,6 +61,12 @@ public final class WaitOptions {
     }
 
     public WaitOptions build() {
+      if (interval == null || interval.isZero() || interval.isNegative()) {
+        throw new IllegalArgumentException("interval must be positive");
+      }
+      if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+        throw new IllegalArgumentException("timeout must be positive");
+      }
       return new WaitOptions(this);
     }
   }

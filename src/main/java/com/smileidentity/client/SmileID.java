@@ -1,6 +1,7 @@
 package com.smileidentity.client;
 
 import java.time.Duration;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 
 /**
@@ -81,6 +82,7 @@ public final class SmileID {
     private String partnerSecret;
     private String defaultCallbackUrl;
     private String baseUrl;
+    private boolean allowInsecureBaseUrl;
     private Duration timeout = Duration.ofSeconds(30);
     private int maxRetries = 2;
     private OkHttpClient httpClient;
@@ -121,6 +123,12 @@ public final class SmileID {
       return this;
     }
 
+    /** Allows http:// loopback baseUrl values for local tests only. */
+    public Builder allowInsecureBaseUrl(boolean allowInsecureBaseUrl) {
+      this.allowInsecureBaseUrl = allowInsecureBaseUrl;
+      return this;
+    }
+
     /** Per-request total timeout. Default 30 seconds. */
     public Builder timeout(Duration timeout) {
       this.timeout = timeout;
@@ -153,7 +161,14 @@ public final class SmileID {
       if (timeout == null || timeout.isNegative() || timeout.isZero()) {
         throw new IllegalArgumentException("timeout must be positive");
       }
-      String resolvedBaseUrl = baseUrl != null ? baseUrl : environment.baseUrl();
+      if (environment == null) {
+        throw new IllegalArgumentException("environment is required");
+      }
+      if (defaultCallbackUrl != null && !defaultCallbackUrl.isEmpty()) {
+        validateCallbackUrl(defaultCallbackUrl);
+      }
+      String resolvedBaseUrl =
+          normalizeBaseUrl(baseUrl != null ? baseUrl : environment.baseUrl(), allowInsecureBaseUrl);
       OkHttpClient base = httpClient != null ? httpClient : new OkHttpClient();
       // retryOnConnectionFailure(false): OkHttp must not transparently re-send requests —
       // §2.6 forbids any auto-retry of non-idempotent POSTs; the transport owns all retries.
@@ -169,6 +184,45 @@ public final class SmileID {
               defaultCallbackUrl,
               maxRetries);
       return new SmileID(transport);
+    }
+
+    private static String normalizeBaseUrl(String value, boolean allowInsecure) {
+      HttpUrl parsed = HttpUrl.parse(value);
+      if (parsed == null || parsed.host().isEmpty()) {
+        throw new IllegalArgumentException("baseUrl must be an absolute URL");
+      }
+      if (!parsed.queryParameterNames().isEmpty() || parsed.fragment() != null) {
+        throw new IllegalArgumentException("baseUrl must not include query or fragment");
+      }
+      if ("https".equals(parsed.scheme())) {
+        return trimTrailingSlash(parsed.toString());
+      }
+      if (allowInsecure && "http".equals(parsed.scheme()) && isLoopbackHost(parsed.host())) {
+        return trimTrailingSlash(parsed.toString());
+      }
+      throw new IllegalArgumentException("baseUrl must use https");
+    }
+
+    static void validateCallbackUrl(String value) {
+      HttpUrl parsed = HttpUrl.parse(value);
+      if (parsed == null || parsed.host().isEmpty()) {
+        throw new IllegalArgumentException("callbackUrl must be an absolute URL");
+      }
+      if (!"https".equals(parsed.scheme())) {
+        throw new IllegalArgumentException("callbackUrl must use https");
+      }
+    }
+
+    private static boolean isLoopbackHost(String host) {
+      return "localhost".equals(host) || "::1".equals(host) || host.startsWith("127.");
+    }
+
+    private static String trimTrailingSlash(String url) {
+      String result = url;
+      while (result.endsWith("/")) {
+        result = result.substring(0, result.length() - 1);
+      }
+      return result;
     }
   }
 }

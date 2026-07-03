@@ -25,7 +25,8 @@ final class TestSupport {
     return SmileID.builder()
         .partnerId(PARTNER_ID)
         .apiKey(API_KEY)
-        .baseUrl("http://127.0.0.1:" + server.getPort() + "/");
+        .baseUrl("http://127.0.0.1:" + server.getPort() + "/")
+        .allowInsecureBaseUrl(true);
   }
 
   /** Builds an unsigned JWT whose payload carries the given exp (epoch seconds). */

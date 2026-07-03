@@ -26,6 +26,9 @@ import okio.Buffer;
 public final class Transport {
 
   private static final MediaType JSON_TYPE = MediaType.get("application/json");
+  private static final long MAX_UPLOAD_BYTES = 64L * 1024 * 1024;
+  private static final long MAX_MULTIPART_BYTES = 256L * 1024 * 1024;
+  private static final long MAX_RESPONSE_BYTES = 16L * 1024 * 1024;
   private static final String USER_AGENT =
       "smileid-sdk-java/"
           + Version.VERSION
@@ -54,7 +57,7 @@ public final class Transport {
       String defaultCallbackUrl,
       int maxRetries) {
     this.http = http;
-    this.baseUrl = trimTrailingSlash(baseUrl);
+    this.baseUrl = baseUrl;
     this.partnerId = partnerId;
     this.apiKey = apiKey;
     this.defaultCallbackUrl = defaultCallbackUrl;
@@ -87,6 +90,10 @@ public final class Transport {
         try {
           Buffer buffer = new Buffer();
           multipart.writeTo(buffer);
+          if (buffer.size() > MAX_MULTIPART_BYTES) {
+            throw new com.smileidentity.errors.ValidationException(
+                "multipart body exceeds " + MAX_MULTIPART_BYTES + " bytes");
+          }
           bodyBytes = buffer.readByteArray();
         } catch (IOException e) {
           throw new ConnectionException("Could not read a binary input: " + e.getMessage(), e);
@@ -124,7 +131,7 @@ public final class Transport {
       String retryAfter;
       try (Response response = client.newCall(request).execute()) {
         status = response.code();
-        responseBody = response.body() != null ? response.body().string() : null;
+        responseBody = response.body() != null ? readResponseBody(response) : null;
         requestId = response.header("X-Request-ID");
         retryAfter = response.header("Retry-After");
       } catch (IOException e) {
@@ -217,7 +224,7 @@ public final class Transport {
         default:
           byte[] bytes;
           try {
-            bytes = part.getBinary().readBytes();
+            bytes = part.getBinary().readBytes(MAX_UPLOAD_BYTES);
           } catch (IOException e) {
             throw new ConnectionException(
                 "Could not read binary input for part " + part.getName() + ": " + e.getMessage(),
@@ -244,7 +251,7 @@ public final class Transport {
     HttpUrl.Builder ub = base.newBuilder();
     for (String segment : req.getPath().split("/")) {
       if (!segment.isEmpty()) {
-        ub.addPathSegment(segment);
+        ub.addEncodedPathSegment(segment);
       }
     }
     for (Map.Entry<String, String> q : req.getQuery().entrySet()) {
@@ -285,11 +292,13 @@ public final class Transport {
     return response.getToken();
   }
 
-  private static String trimTrailingSlash(String url) {
-    String result = url;
-    while (result.endsWith("/")) {
-      result = result.substring(0, result.length() - 1);
+  private static String readResponseBody(Response response) throws IOException {
+    Buffer buffer = new Buffer();
+    long read = response.body().source().readAll(buffer);
+    if (read > MAX_RESPONSE_BYTES) {
+      throw new com.smileidentity.errors.ValidationException(
+          "response body exceeds " + MAX_RESPONSE_BYTES + " bytes");
     }
-    return result;
+    return buffer.readUtf8();
   }
 }

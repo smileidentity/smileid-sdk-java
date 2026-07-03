@@ -21,7 +21,7 @@ public final class DocumentsResource {
   }
 
   public AcceptedResponse verify(DocumentVerificationParams params, RequestOptions options) {
-    Validators.requireEmailOrPhone(params.getUserDetails());
+    Validators.validateDocumentVerification(params);
     return DocumentOperations.documentVerification(transport, params, options);
   }
 
@@ -32,8 +32,7 @@ public final class DocumentsResource {
 
   public AcceptedResponse verifyEnhanced(
       EnhancedDocumentVerificationParams params, RequestOptions options) {
-    Validators.requireEmailOrPhone(params.getUserDetails());
-    Validators.requireIdType(params.getIdType());
+    Validators.validateEnhancedDocumentVerification(params);
     return DocumentOperations.enhancedDocumentVerification(transport, params, options);
   }
 }

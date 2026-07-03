@@ -30,7 +30,7 @@ public final class UserOperations {
     ApiRequest request =
         ApiRequest.builder()
             .method("POST")
-            .path("/v3/users/" + userId + "/report_fraud")
+            .path("/v3/users/" + OperationSupport.pathSegment(userId) + "/report_fraud")
             .authenticated(true)
             .multipart(parts)
             .options(options)

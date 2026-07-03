@@ -9,13 +9,17 @@ import com.smileidentity.errors.InvalidRequestException;
 import com.smileidentity.errors.ValidationException;
 import com.smileidentity.generated.models.AuthenticationParams;
 import com.smileidentity.generated.models.Consent;
+import com.smileidentity.generated.models.DocumentVerificationParams;
 import com.smileidentity.generated.models.EnhancedDocumentVerificationParams;
 import com.smileidentity.generated.models.EnhancedKycParams;
 import com.smileidentity.generated.models.EnrollParams;
 import com.smileidentity.generated.models.FraudReason;
 import com.smileidentity.generated.models.ReportFraudParams;
 import com.smileidentity.generated.models.UserDetails;
+import com.smileidentity.helpers.BinaryInput;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +52,56 @@ class ValidationTest {
 
   private static UserDetails noContactDetails() {
     return UserDetails.builder().givenNames("John").lastName("Doe").build();
+  }
+
+  private static UserDetails validUserDetails() {
+    return UserDetails.builder()
+        .givenNames("John")
+        .lastName("Doe")
+        .email("john@example.com")
+        .build();
+  }
+
+  private static List<BinaryInput> liveness(int count) {
+    List<BinaryInput> images = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      images.add(BinaryInput.of(new byte[] {1, 2, 3}));
+    }
+    return images;
+  }
+
+  @Test
+  void configRejectsUnsafeBaseUrl() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            SmileID.builder()
+                .partnerId("1234")
+                .apiKey("key")
+                .baseUrl("http://api.example.com")
+                .build());
+  }
+
+  @Test
+  void configAllowsExplicitInsecureLoopbackBaseUrl() {
+    SmileID.builder()
+        .partnerId("1234")
+        .apiKey("key")
+        .baseUrl("http://localhost:8080")
+        .allowInsecureBaseUrl(true)
+        .build();
+  }
+
+  @Test
+  void configRejectsInsecureDefaultCallbackUrl() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            SmileID.builder()
+                .partnerId("1234")
+                .apiKey("key")
+                .defaultCallbackUrl("http://partner.example.com/webhook")
+                .build());
   }
 
   @Test
@@ -97,6 +151,58 @@ class ValidationTest {
                         .consent(consent())
                         .build()));
     assertEquals(0, server.getRequestCount(), "id_type is enforced client-side (spec §6.3)");
+  }
+
+  @Test
+  void livenessImageCountMustBeSixToEight() {
+    assertThrows(
+        ValidationException.class,
+        () ->
+            smile
+                .documents()
+                .verify(
+                    DocumentVerificationParams.builder()
+                        .selfieImage(BinaryInput.of(new byte[] {1}))
+                        .livenessImages(liveness(5))
+                        .document(BinaryInput.of(new byte[] {1}))
+                        .country("NG")
+                        .userDetails(validUserDetails())
+                        .consent(consent())
+                        .build()));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void callbackUrlMustUseHttps() {
+    assertThrows(
+        ValidationException.class,
+        () ->
+            smile
+                .enhancedKyc()
+                .verify(
+                    EnhancedKycParams.builder()
+                        .country("NG")
+                        .idType("NIN")
+                        .idNumber("12345678901")
+                        .userDetails(validUserDetails())
+                        .consent(consent())
+                        .callbackUrl("http://partner.example.com/webhook")
+                        .build()));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void pathParametersAreEncodedAsSingleSegments() throws Exception {
+    server.enqueue(
+        TestSupport.tokenResponse(TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 3600)));
+    server.enqueue(
+        TestSupport.json(
+            200, "{\"status\":\"complete\",\"job_id\":\"job/with/slash\",\"user_id\":\"user\"}"));
+
+    smile.verifications().retrieve("job/with/slash");
+
+    server.takeRequest();
+    assertEquals("/v3/status/job%2Fwith%2Fslash", server.takeRequest().getPath());
   }
 
   @Test

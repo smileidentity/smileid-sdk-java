@@ -21,7 +21,7 @@ public final class VerificationOperations {
     ApiRequest request =
         ApiRequest.builder()
             .method("GET")
-            .path("/v3/status/" + jobId)
+            .path("/v3/status/" + OperationSupport.pathSegment(jobId))
             .authenticated(true)
             .idempotent(true)
             .notFoundReturnsBody(true)
@@ -39,7 +39,7 @@ public final class VerificationOperations {
     ApiRequest request =
         ApiRequest.builder()
             .method("POST")
-            .path("/v3/replay/" + jobId)
+            .path("/v3/replay/" + OperationSupport.pathSegment(jobId))
             .authenticated(true)
             .jsonBody(body)
             .options(options)

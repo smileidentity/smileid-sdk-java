@@ -22,7 +22,7 @@ public final class BiometricResource {
   }
 
   public AcceptedResponse enroll(EnrollParams params, RequestOptions options) {
-    Validators.requireEmailOrPhone(params.getUserDetails());
+    Validators.validateEnroll(params);
     return BiometricOperations.registration(transport, params, options);
   }
 
@@ -32,7 +32,6 @@ public final class BiometricResource {
   }
 
   public AcceptedResponse authenticate(AuthenticationParams params, RequestOptions options) {
-    Validators.requireEmailOrPhone(params.getUserDetails());
     Validators.validateAuthenticationImages(params);
     return BiometricOperations.authentication(transport, params, options);
   }
@@ -43,7 +42,7 @@ public final class BiometricResource {
   }
 
   public AcceptedResponse compare(CompareParams params, RequestOptions options) {
-    Validators.requireEmailOrPhone(params.getUserDetails());
+    Validators.validateCompare(params);
     return BiometricOperations.compare(transport, params, options);
   }
 }

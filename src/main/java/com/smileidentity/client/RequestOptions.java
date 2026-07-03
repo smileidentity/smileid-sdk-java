@@ -48,6 +48,9 @@ public final class RequestOptions {
     }
 
     public RequestOptions build() {
+      if (timeout != null && (timeout.isZero() || timeout.isNegative())) {
+        throw new IllegalArgumentException("timeout must be positive");
+      }
       return new RequestOptions(this);
     }
   }

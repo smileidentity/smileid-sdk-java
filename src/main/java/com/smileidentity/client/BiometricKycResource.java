@@ -19,7 +19,7 @@ public final class BiometricKycResource {
   }
 
   public AcceptedResponse verify(BiometricKycParams params, RequestOptions options) {
-    Validators.requireEmailOrPhone(params.getUserDetails());
+    Validators.validateBiometricKyc(params);
     return BiometricOperations.biometricKyc(transport, params, options);
   }
 }

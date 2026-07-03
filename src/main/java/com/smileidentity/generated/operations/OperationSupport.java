@@ -3,12 +3,14 @@ package com.smileidentity.generated.operations;
 import com.smileidentity.client.Part;
 import com.smileidentity.client.RequestOptions;
 import com.smileidentity.client.Transport;
+import com.smileidentity.errors.ValidationException;
 import com.smileidentity.generated.models.Consent;
 import com.smileidentity.generated.models.MetadataEntry;
 import com.smileidentity.generated.models.UserDetails;
 import com.smileidentity.helpers.BinaryInput;
 import java.util.List;
 import java.util.Map;
+import okhttp3.HttpUrl;
 
 /** Shared param-to-part routing for the multipart operations (spec §2A build_multipart, §5.3). */
 final class OperationSupport {
@@ -21,12 +23,34 @@ final class OperationSupport {
   static String effectiveCallbackUrl(
       Transport transport, String paramsCallbackUrl, RequestOptions options) {
     if (options != null && options.getCallbackUrl() != null) {
+      validateCallbackUrl(options.getCallbackUrl());
       return options.getCallbackUrl();
     }
     if (paramsCallbackUrl != null) {
+      validateCallbackUrl(paramsCallbackUrl);
       return paramsCallbackUrl;
     }
     return transport.defaultCallbackUrl();
+  }
+
+  static String pathSegment(String value) {
+    return new HttpUrl.Builder()
+        .scheme("https")
+        .host("example.com")
+        .addPathSegment(value)
+        .build()
+        .encodedPath()
+        .substring(1);
+  }
+
+  private static void validateCallbackUrl(String value) {
+    HttpUrl parsed = HttpUrl.parse(value);
+    if (parsed == null || parsed.host().isEmpty()) {
+      throw new ValidationException("callback_url must be an absolute URL");
+    }
+    if (!"https".equals(parsed.scheme())) {
+      throw new ValidationException("callback_url must use https");
+    }
   }
 
   static void addText(List<Part> parts, String name, String value) {

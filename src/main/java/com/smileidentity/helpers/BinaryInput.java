@@ -77,13 +77,27 @@ public final class BinaryInput {
 
   /** Reads the full content. Cached so detection and serialization share one read. */
   public byte[] readBytes() throws IOException {
+    return readBytes(0);
+  }
+
+  /** Reads the full content, failing if it exceeds maxBytes. A non-positive max means unlimited. */
+  public byte[] readBytes(long maxBytes) throws IOException {
     if (bytes != null) {
+      if (maxBytes > 0 && bytes.length > maxBytes) {
+        throw new ValidationException("binary input exceeds " + maxBytes + " bytes");
+      }
       return bytes;
     }
     if (cachedBytes != null) {
+      if (maxBytes > 0 && cachedBytes.length > maxBytes) {
+        throw new ValidationException("binary input exceeds " + maxBytes + " bytes");
+      }
       return cachedBytes;
     }
     if (file != null) {
+      if (maxBytes > 0 && file.length() > maxBytes) {
+        throw new ValidationException("binary input exceeds " + maxBytes + " bytes");
+      }
       cachedBytes = Files.readAllBytes(file.toPath());
       return cachedBytes;
     }
@@ -91,6 +105,9 @@ public final class BinaryInput {
     byte[] buf = new byte[8192];
     int n;
     while ((n = stream.read(buf)) != -1) {
+      if (maxBytes > 0 && out.size() + n > maxBytes) {
+        throw new ValidationException("binary input exceeds " + maxBytes + " bytes");
+      }
       out.write(buf, 0, n);
     }
     cachedBytes = out.toByteArray();

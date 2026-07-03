@@ -58,11 +58,13 @@ Configuration options:
 | `apiKey` | required | Partner API key |
 | `environment` | `SANDBOX` | `SANDBOX` or `PRODUCTION` |
 | `partnerSecret` | unset | Enables HMAC request signing when set (see below) |
-| `defaultCallbackUrl` | unset | Used when a call omits `callbackUrl` |
-| `baseUrl` | derived | Explicit override; wins over `environment` |
+| `defaultCallbackUrl` | unset | Used when a call omits `callbackUrl`; must be https |
+| `baseUrl` | derived | Explicit override; wins over `environment`; must be https |
 | `timeout` | 30 seconds | Per-request total timeout |
 | `maxRetries` | 2 | Idempotent operations only |
 | `httpClient` | SDK default | Inject your own `OkHttpClient` |
+
+The SDK only talks https. `baseUrl` must be an absolute https URL with no query or fragment — the builder rejects anything else and there is no insecure override. Callback URLs (`defaultCallbackUrl` and per-request `callbackUrl` values) must be https too: the default is checked when you build the client, per-request values are checked before any request is sent.
 
 ## Environments
 
@@ -303,6 +305,7 @@ All errors extend `com.smileidentity.errors.SmileIDException` and expose `getSta
 | `PayloadTooLargeException` | HTTP 413 |
 | `RateLimitException` | HTTP 429 |
 | `ApiException` | HTTP 5xx |
+| `UnexpectedResponseException` | A 2xx response body that is not a JSON object |
 | `ConnectionException` | Network failure or timeout, no HTTP response |
 | `TimeoutException` | `waitUntilComplete` deadline passed |
 

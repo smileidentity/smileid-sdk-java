@@ -7,8 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `baseUrl` must now be an absolute https URL with no query or fragment; the
+  builder rejects anything else and there is no insecure override.
+- Callback URLs (`defaultCallbackUrl` and per-request `callbackUrl`) must be
+  https, validated at construction and before send.
+- `job_id` and `user_id` path parameters are percent-encoded as single path
+  segments, so a hostile id cannot alter the request path.
+- Caller-supplied multipart content types are validated before send; invalid
+  values (for example containing CR/LF) raise `ValidationException`. Hostile
+  filenames are covered by tests (OkHttp escapes CR, LF and quotes).
+
 ### Changed
 
+- A 2xx response whose body is not a JSON object now raises the new
+  `UnexpectedResponseException` instead of a generic parse failure.
+- The offline test suite runs against a TLS MockWebServer (okhttp-tls,
+  test-only dependency).
 - Renamed the Maven artifact from `smile-identity-core` to `smileid`; the
   coordinates are now `com.smileidentity:smileid`. The `com.smileidentity`
   package namespace is unchanged.

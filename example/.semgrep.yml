@@ -1,0 +1,15 @@
+rules:
+  - id: java-hardcoded-smile-credentials
+    message: Do not hard-code Smile ID credentials; read them from environment variables or a secret manager.
+    severity: ERROR
+    languages:
+      - java
+    patterns:
+      - pattern-either:
+          - pattern: |
+              SmileID.builder().apiKey("...").build()
+          - pattern: |
+              SmileID.builder().partnerSecret("...").build()
+    metadata:
+      category: security
+      confidence: MEDIUM

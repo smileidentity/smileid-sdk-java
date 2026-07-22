@@ -1,1 +1,1 @@
-rootProject.name = "usesmileid"
+rootProject.name = "usesmileid-java"

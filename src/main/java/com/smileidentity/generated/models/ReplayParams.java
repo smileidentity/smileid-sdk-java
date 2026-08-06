@@ -1,6 +1,6 @@
 package com.smileidentity.generated.models;
 
-/** Optional JSON body for POST /v3/replay/{job_id} (spec §6.10). */
+/** Optional multipart/form-data body for POST /v3/replay/{job_id} (spec §6.10 as corrected). */
 public final class ReplayParams {
 
   private final String callbackUrl;

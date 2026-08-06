@@ -582,7 +582,7 @@ class GoldenFixturesTest {
   // ---------------------------------------------------------------- 6.10 replay
 
   @Test
-  void replaySendsJsonNotMultipart() throws Exception {
+  void replayWithOverrideSendsMultipartWithOneCallbackUrlPart() throws Exception {
     enqueueToken();
     server.enqueue(
         TestSupport.json(
@@ -601,15 +601,21 @@ class GoldenFixturesTest {
     RecordedRequest r = server.takeRequest();
     assertEquals("POST", r.getMethod());
     assertEquals("/v3/replay/job_01h2xcejqtf2nbrexx3vqjhp41", r.getPath());
+    // Corrected contract: the backend takes multipart/form-data, not JSON.
     assertTrue(
-        r.getHeader("Content-Type").startsWith("application/json"), "replay is JSON (§6.10)");
-    assertEquals("{\"callback_url\":\"https://app.example.com/cb\"}", r.getBody().readUtf8());
+        r.getHeader("Content-Type").startsWith("multipart/form-data"),
+        "replay body is multipart, got " + r.getHeader("Content-Type"));
+    List<TestPart> parts = MultipartParser.parse(r);
+    assertEquals(1, parts.size(), "exactly one part");
+    TestPart callback = MultipartParser.single(parts, "callback_url");
+    assertEquals("https://app.example.com/cb", callback.body);
+    assertNull(callback.contentType, "scalar text part has no content type");
     assertEquals("accepted", response.getStatus());
     assertEquals("test-user", response.getUserId());
   }
 
   @Test
-  void replayWithoutParamsSendsAnEmptyJsonObject() throws Exception {
+  void replayWithoutOverrideSendsNoBody() throws Exception {
     enqueueToken();
     server.enqueue(
         TestSupport.json(
@@ -619,7 +625,9 @@ class GoldenFixturesTest {
     smile.verifications().replay("job_01h2xcejqtf2nbrexx3vqjhp41");
     server.takeRequest();
     RecordedRequest r = server.takeRequest();
-    assertEquals("{}", r.getBody().readUtf8());
+    // OkHttp requires a RequestBody on POST, so this is a zero-length body with no Content-Type.
+    assertEquals(0, r.getBodySize());
+    assertNull(r.getHeader("Content-Type"));
   }
 
   @Test

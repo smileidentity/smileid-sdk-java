@@ -41,7 +41,10 @@ public final class VerificationsResource {
     return JobPoller.waitUntilComplete(jobId, () -> retrieve(jobId), options);
   }
 
-  /** POST /v3/replay/{job_id} — JSON body, never auto-retried (spec §6.10). */
+  /**
+   * POST /v3/replay/{job_id} — optional multipart body (one callback_url part when overriding, no
+   * body otherwise), never auto-retried (spec §6.10 as corrected).
+   */
   public ReplayCallbackResponse replay(String jobId) {
     return replay(jobId, null, RequestOptions.none());
   }

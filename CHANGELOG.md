@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Callback replay now sends its optional body as multipart/form-data (one
+  `callback_url` part), matching the backend; no body is sent when there is
+  no override. It was wrongly specced as JSON, which the backend rejects
+  with 415.
 - A 2xx response whose body is not a JSON object now raises the new
   `UnexpectedResponseException` instead of a generic parse failure.
 - The offline test suite runs against a TLS MockWebServer (okhttp-tls,

@@ -32,3 +32,5 @@ jobs:
         run: ./gradlew spotlessCheck
       - name: Build and test
         run: ./gradlew build test
+      - name: Example app tests
+        run: ./gradlew -p example build

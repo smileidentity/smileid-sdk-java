@@ -126,10 +126,10 @@ final class ExampleAppTest {
     assertEquals("success", result.get("status"));
     assertEquals("job_enhanced_123", result.get("job_id"));
     RecordedRequest request = fake.find("/v3/replay/job_enhanced_123");
-    assertEquals(
-        "https://example.com/replay-callback",
-        JSON.readValue(request.body, new TypeReference<Map<String, String>>() {})
-            .get("callback_url"));
+    // Replay sends multipart/form-data with one callback_url part (spec §6.10 as corrected).
+    // The Content-Type header is added after application interceptors, so assert on the body.
+    assertTrue(request.body.contains("name=\"callback_url\""));
+    assertTrue(request.body.contains("https://example.com/replay-callback"));
   }
 
   @Test

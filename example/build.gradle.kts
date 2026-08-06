@@ -13,7 +13,7 @@ java {
 }
 
 dependencies {
-    implementation("com.smileidentity:smileid:12.0.0")
+    implementation("com.smileidentity:usesmileid-java:12.0.0")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

@@ -100,13 +100,26 @@ class ModelsTest {
   void jobStatusParsesTerminalProcessingAndNotFound() throws Exception {
     JobStatus complete =
         mapper.readValue(
-            "{\"status\":\"complete\",\"job_id\":\"job_01h2xcejqtf2nbrexx3vqjhp41\","
+            "{\"status\":\"clear\",\"job_id\":\"job_01h2xcejqtf2nbrexx3vqjhp41\","
                 + "\"user_id\":\"user_01h8x9y2z3a4b5c6d7e8f9g0h1\","
-                + "\"message\":\"Verification completed with state: clear\"}",
+                + "\"message\":\"Job completed\"}",
             JobStatus.class);
     assertTrue(complete.isComplete());
     assertFalse(complete.isProcessing());
-    assertEquals("Verification completed with state: clear", complete.getMessage());
+    assertEquals("clear", complete.getStatus());
+    assertEquals("Job completed", complete.getMessage());
+
+    JobStatus blocked =
+        mapper.readValue(
+            "{\"status\":\"block\",\"job_id\":\"job_01h2xcejqtf2nbrexx3vqjhp41\","
+                + "\"user_id\":\"user_01h8x9y2z3a4b5c6d7e8f9g0h1\","
+                + "\"message\":\"Job completed\"}",
+            JobStatus.class);
+    assertTrue(blocked.isComplete());
+
+    // A truncated or malformed response is not a decision.
+    assertFalse(mapper.readValue("{\"status\":\"\"}", JobStatus.class).isComplete());
+    assertFalse(mapper.readValue("{}", JobStatus.class).isComplete());
 
     JobStatus processing =
         mapper.readValue(

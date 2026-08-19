@@ -63,6 +63,18 @@ Configuration options:
 | `maxRetries` | 2 | Idempotent operations only |
 | `httpClient` | SDK default | Inject your own `OkHttpClient` |
 
+Partner ids are displayed zero-padded in the portal (for example 002) but must be passed without the leading zeros (`"2"`).
+
+`environment` only names the sandbox and production. To reach any other Smile ID host — a development API, for instance — set `baseUrl`, which wins over `environment`:
+
+```java
+SmileID smile = SmileID.builder()
+    .partnerId("2")
+    .apiKey(System.getenv("SMILE_API_KEY"))
+    .baseUrl("https://devapi.smileidentity.com")
+    .build();
+```
+
 The SDK only talks https. `baseUrl` must be an absolute https URL with no query or fragment — the builder rejects anything else and there is no insecure override. Callback URLs (`defaultCallbackUrl` and per-request `callbackUrl` values) must be https too: the default is checked when you build the client, per-request values are checked before any request is sent.
 
 ## Environments
@@ -82,13 +94,15 @@ import com.smileidentity.generated.models.UserDetails;
 import java.time.Instant;
 
 UserDetails user = UserDetails.builder()
-    .givenNames("John")
-    .lastName("Doe")
-    .email("john@example.com")   // at least one of email or phoneNumber is required
+    .givenNames("Amina Fatou")
+    .lastName("Clearwater")
+    .email("amina.clearwater@example.com")   // at least one of email or phoneNumber is required
     .build();
 
 Consent consent = Consent.granted(Instant.now(), "EN", "https://example.com/privacy");
 ```
+
+Non-production environments match test identities on given names, last name and email. The identity above is a recognised test identity and resolves to `clear`; an unrecognised one resolves to `block`.
 
 Binary inputs (selfies, liveness frames, documents) accept a `File`, a `byte[]` or an `InputStream` via `BinaryInput.of(...)`, with optional `.withFilename(...)` and `.withContentType(...)`.
 
@@ -220,10 +234,13 @@ AcceptedResponse accepted = smile.biometric().compare(CompareParams.builder()
 import com.smileidentity.generated.models.JobStatus;
 
 JobStatus status = smile.verifications().retrieve("job_01h2xcejqtf2nbrexx3vqjhp41");
-status.isComplete();    // terminal
+status.isComplete();    // reached a decision
 status.isProcessing();  // still running
 status.isNotFound();    // a 404 returns this status instead of raising
+status.getStatus();     // "processing", or the decision: "clear", "block", "attention", "error"
 ```
+
+While a job runs, `status` is `processing`. When it finishes, `status` carries the decision itself and `message` is a plain sentence such as `Job completed`. There is no literal `complete` status — read the decision from `status`, not from `message`. `isComplete()` is true for any status other than `processing` and `not_found`.
 
 ### Wait for completion
 
@@ -238,9 +255,11 @@ JobStatus done = smile.verifications().waitUntilComplete(
         .timeout(Duration.ofSeconds(60))
         .treatNotFoundAsPending(true)
         .build());
+
+done.getStatus();  // "clear", "block", "attention" or "error"
 ```
 
-Raises `com.smileidentity.errors.TimeoutException` if the deadline passes.
+Polls while the job is `processing` and returns as soon as it reaches a decision. Raises `com.smileidentity.errors.TimeoutException` if the deadline passes.
 
 ### Replay a callback
 

@@ -63,11 +63,11 @@ final class ExampleAppTest {
                   "--id-number",
                   "12345678901",
                   "--given-names",
-                  "Amina",
+                  "Amina Fatou",
                   "--last-name",
-                  "Okafor",
+                  "Clearwater",
                   "--email",
-                  "amina@example.com"
+                  "amina.clearwater@example.com"
                 });
 
     assertEquals(0, code);
@@ -82,7 +82,7 @@ final class ExampleAppTest {
     assertTrue(request.body.contains("name=\"id_type\""));
     assertTrue(request.body.contains("NIN"));
     assertTrue(request.body.contains("https://example.com/smile-callback"));
-    assertTrue(request.body.contains("\"given_names\":\"Amina\""));
+    assertTrue(request.body.contains("\"given_names\":\"Amina Fatou\""));
   }
 
   @Test
@@ -99,8 +99,8 @@ final class ExampleAppTest {
 
     assertEquals(0, code);
     Map<String, Object> result = json(out);
-    assertEquals("complete", result.get("status"));
-    assertEquals("clear", result.get("message"));
+    assertEquals("clear", result.get("status"));
+    assertEquals("Job completed", result.get("message"));
   }
 
   @Test
@@ -208,7 +208,7 @@ final class ExampleAppTest {
         return response(
             request,
             200,
-            "{\"status\":\"complete\",\"message\":\"clear\",\"job_id\":\"job_enhanced_123\",\"user_id\":\"user_123\"}");
+            "{\"status\":\"clear\",\"message\":\"Job completed\",\"job_id\":\"job_enhanced_123\",\"user_id\":\"user_123\"}");
       }
       if (path.equals("/v3/replay/job_enhanced_123")) {
         return response(

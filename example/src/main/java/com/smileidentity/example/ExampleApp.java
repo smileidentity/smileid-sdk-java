@@ -241,10 +241,13 @@ public final class ExampleApp {
   private String usage() {
     return "Usage:\n"
         + "  smileid-example-java [global flags] services --country NG\n"
-        + "  smileid-example-java [global flags] enhanced-kyc --country NG --id-type NIN --id-number 12345678901 --given-names Amina --last-name Okafor --email amina@example.com --privacy-url https://example.com/privacy\n"
+        + "  smileid-example-java [global flags] enhanced-kyc --country NG --id-type NIN --id-number 12345678901 --given-names 'Amina Fatou' --last-name Clearwater --email amina.clearwater@example.com --privacy-url https://example.com/privacy\n"
         + "  smileid-example-java [global flags] status --job-id job_...\n"
         + "  smileid-example-java [global flags] replay --job-id job_... --callback-url https://example.com/webhook\n\n"
-        + "Global flags can also be set with SMILE_PARTNER_ID, SMILE_API_KEY, SMILE_BASE_URL, SMILE_CALLBACK_URL and SMILE_TIMEOUT_MS.\n";
+        + "Global flags can also be set with SMILE_PARTNER_ID, SMILE_API_KEY, SMILE_BASE_URL, SMILE_CALLBACK_URL and SMILE_TIMEOUT_MS.\n"
+        + "Partner ids are displayed zero-padded (for example 002) but must be passed without the leading zeros (2).\n"
+        + "SMILE_BASE_URL (or --base-url) points the SDK at a host such as https://devapi.smileidentity.com; without it the sandbox is used.\n"
+        + "Non-production environments match test identities on given names, last name and email. An unrecognised identity resolves to block.\n";
   }
 
   private static final class Parsed {

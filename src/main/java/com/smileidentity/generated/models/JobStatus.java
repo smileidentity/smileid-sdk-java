@@ -33,7 +33,7 @@ public final class JobStatus {
    * "not_found". Read {@link #getStatus()} for the decision itself.
    */
   public boolean isComplete() {
-    return status != null && !isProcessing() && !isNotFound();
+    return status != null && !status.trim().isEmpty() && !isProcessing() && !isNotFound();
   }
 
   public boolean isProcessing() {

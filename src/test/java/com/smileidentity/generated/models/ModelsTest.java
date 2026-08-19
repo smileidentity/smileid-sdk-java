@@ -117,6 +117,10 @@ class ModelsTest {
             JobStatus.class);
     assertTrue(blocked.isComplete());
 
+    // A truncated or malformed response is not a decision.
+    assertFalse(mapper.readValue("{\"status\":\"\"}", JobStatus.class).isComplete());
+    assertFalse(mapper.readValue("{}", JobStatus.class).isComplete());
+
     JobStatus processing =
         mapper.readValue(
             "{\"status\":\"processing\",\"job_id\":\"job_01h2xcejqtf2nbrexx3vqjhp41\","

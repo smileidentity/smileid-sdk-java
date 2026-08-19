@@ -29,9 +29,10 @@ public final class VerificationsResource {
   }
 
   /**
-   * Polls {@link #retrieve(String)} until the job completes (spec §6.9). Defaults: 2 second
-   * interval, 60 second timeout, not_found treated as pending. Raises {@link
-   * com.smileidentity.errors.TimeoutException} at the deadline.
+   * Polls {@link #retrieve(String)} until the job reaches a decision — any status other than
+   * "processing" and "not_found" (spec §6.9). Defaults: 2 second interval, 60 second timeout,
+   * not_found treated as pending. Raises {@link com.smileidentity.errors.TimeoutException} at the
+   * deadline.
    */
   public JobStatus waitUntilComplete(String jobId) {
     return waitUntilComplete(jobId, WaitOptions.defaults());

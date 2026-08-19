@@ -10,8 +10,9 @@ public final class JobPoller {
   private JobPoller() {}
 
   /**
-   * Polls {@code retrieve} until the job is complete, or not_found when not treated as pending, and
-   * raises {@link TimeoutException} when the deadline passes.
+   * Polls {@code retrieve} while the job is "processing" (and while it is "not_found", when that is
+   * treated as pending), and returns as soon as the status is anything else — the decision, for
+   * example "clear" or "block". Raises {@link TimeoutException} when the deadline passes.
    */
   public static JobStatus waitUntilComplete(
       String jobId, Supplier<JobStatus> retrieve, WaitOptions options) {

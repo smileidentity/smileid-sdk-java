@@ -1,5 +1,6 @@
 package com.smileidentity;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -17,9 +18,10 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 /**
- * Sandbox end-to-end test (spec §11 gate item 5): submits an Enhanced KYC job and polls it to
- * completion. Reads SMILE_PARTNER_ID and SMILE_API_KEY from the environment and skips cleanly (does
- * not fail) when they are unset. Credential values are never printed or logged.
+ * Sandbox end-to-end test (spec §11 gate item 5): submits an Enhanced KYC job and polls it to a
+ * decision. Reads SMILE_PARTNER_ID and SMILE_API_KEY from the environment and skips cleanly (does
+ * not fail) when they are unset. Targets the sandbox unless SMILE_BASE_URL points somewhere else.
+ * Credential values are never printed or logged.
  */
 class EndToEndTest {
 
@@ -27,18 +29,19 @@ class EndToEndTest {
   void sandboxEnhancedKycCompletesEndToEnd() {
     String partnerId = System.getenv("SMILE_PARTNER_ID");
     String apiKey = System.getenv("SMILE_API_KEY");
+    String baseUrl = System.getenv("SMILE_BASE_URL");
     assumeTrue(
         partnerId != null && !partnerId.isEmpty() && apiKey != null && !apiKey.isEmpty(),
         "SMILE_PARTNER_ID and SMILE_API_KEY are not set; skipping the sandbox E2E test");
 
-    SmileID smile =
-        SmileID.builder()
-            .partnerId(partnerId)
-            .apiKey(apiKey)
-            .environment(Environment.SANDBOX)
-            .build();
+    SmileID.Builder builder =
+        SmileID.builder().partnerId(partnerId).apiKey(apiKey).environment(Environment.SANDBOX);
+    if (baseUrl != null && !baseUrl.isEmpty()) {
+      builder.baseUrl(baseUrl);
+    }
+    SmileID smile = builder.build();
 
-    // The sandbox only accepts recognized test identities, matched on
+    // Non-production environments only accept recognized test identities, matched on
     // given_names + last_name + email.
     AcceptedResponse accepted =
         smile
@@ -71,5 +74,7 @@ class EndToEndTest {
                     .build());
     assertTrue(
         status.isComplete(), "job should reach a terminal state, got: " + status.getStatus());
+    assertEquals(
+        "clear", status.getStatus(), "the Clearwater test identity should resolve to clear");
   }
 }

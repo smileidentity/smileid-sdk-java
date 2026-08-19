@@ -538,9 +538,9 @@ class GoldenFixturesTest {
     server.enqueue(
         TestSupport.json(
             200,
-            "{\"status\":\"complete\",\"job_id\":\"job_01h2xcejqtf2nbrexx3vqjhp41\","
+            "{\"status\":\"clear\",\"job_id\":\"job_01h2xcejqtf2nbrexx3vqjhp41\","
                 + "\"user_id\":\"user_01h8x9y2z3a4b5c6d7e8f9g0h1\","
-                + "\"message\":\"Verification completed with state: clear\"}"));
+                + "\"message\":\"Job completed\"}"));
 
     JobStatus status = smile.verifications().retrieve("job_01h2xcejqtf2nbrexx3vqjhp41");
 
@@ -550,7 +550,8 @@ class GoldenFixturesTest {
     assertEquals("/v3/status/job_01h2xcejqtf2nbrexx3vqjhp41", r.getPath());
     assertNotNull(r.getHeader("SmileID-Token"));
     assertTrue(status.isComplete());
-    assertEquals("Verification completed with state: clear", status.getMessage());
+    assertEquals("clear", status.getStatus());
+    assertEquals("Job completed", status.getMessage());
   }
 
   @Test

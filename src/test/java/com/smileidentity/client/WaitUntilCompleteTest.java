@@ -41,7 +41,7 @@ class WaitUntilCompleteTest {
         + status
         + "\",\"job_id\":\""
         + JOB_ID
-        + "\",\"user_id\":\"user_01h8x9y2z3a4b5c6d7e8f9g0h1\",\"message\":\"...\"}";
+        + "\",\"user_id\":\"user_01h8x9y2z3a4b5c6d7e8f9g0h1\",\"message\":\"Job completed\"}";
   }
 
   private void enqueueToken() {
@@ -54,7 +54,7 @@ class WaitUntilCompleteTest {
     enqueueToken();
     server.enqueue(TestSupport.json(202, statusBody("processing")));
     server.enqueue(TestSupport.json(202, statusBody("processing")));
-    server.enqueue(TestSupport.json(200, statusBody("complete")));
+    server.enqueue(TestSupport.json(200, statusBody("clear")));
 
     JobStatus status =
         smile
@@ -67,7 +67,29 @@ class WaitUntilCompleteTest {
                     .build());
 
     assertTrue(status.isComplete());
+    assertEquals("clear", status.getStatus());
     assertEquals(4, server.getRequestCount(), "token + three polls");
+  }
+
+  @Test
+  void returnsOnBlockAsWellAsClear() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, statusBody("processing")));
+    server.enqueue(TestSupport.json(200, statusBody("block")));
+
+    JobStatus status =
+        smile
+            .verifications()
+            .waitUntilComplete(
+                JOB_ID,
+                WaitOptions.builder()
+                    .interval(Duration.ofMillis(5))
+                    .timeout(Duration.ofSeconds(5))
+                    .build());
+
+    assertTrue(status.isComplete());
+    assertEquals("block", status.getStatus());
+    assertEquals(3, server.getRequestCount(), "token + processing poll + block poll");
   }
 
   @Test
@@ -113,7 +135,7 @@ class WaitUntilCompleteTest {
   void notFoundIsTreatedAsPendingByDefault() throws Exception {
     enqueueToken();
     server.enqueue(TestSupport.json(404, statusBody("not_found")));
-    server.enqueue(TestSupport.json(200, statusBody("complete")));
+    server.enqueue(TestSupport.json(200, statusBody("clear")));
 
     JobStatus status =
         smile
@@ -126,7 +148,7 @@ class WaitUntilCompleteTest {
                     .build());
 
     assertTrue(status.isComplete());
-    assertEquals(3, server.getRequestCount(), "token + not_found poll + complete poll");
+    assertEquals(3, server.getRequestCount(), "token + not_found poll + clear poll");
   }
 
   @Test

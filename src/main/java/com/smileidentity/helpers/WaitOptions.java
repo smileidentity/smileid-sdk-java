@@ -4,7 +4,7 @@ import java.time.Duration;
 
 /**
  * Options for {@code verifications().waitUntilComplete(...)} (spec §6.9). Defaults: poll every 2
- * seconds, give up after 60 seconds, and treat not_found as still pending.
+ * seconds, give up after 120 seconds, and treat not_found as still pending.
  */
 public final class WaitOptions {
 
@@ -42,7 +42,7 @@ public final class WaitOptions {
 
   public static final class Builder {
     private Duration interval = Duration.ofSeconds(2);
-    private Duration timeout = Duration.ofSeconds(60);
+    private Duration timeout = Duration.ofSeconds(120);
     private boolean treatNotFoundAsPending = true;
 
     public Builder interval(Duration interval) {

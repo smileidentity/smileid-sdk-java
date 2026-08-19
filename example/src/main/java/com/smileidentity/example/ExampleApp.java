@@ -246,7 +246,7 @@ public final class ExampleApp {
         + "  smileid-example-java [global flags] replay --job-id job_... --callback-url https://example.com/webhook\n\n"
         + "Global flags can also be set with SMILE_PARTNER_ID, SMILE_API_KEY, SMILE_BASE_URL, SMILE_CALLBACK_URL and SMILE_TIMEOUT_MS.\n"
         + "Partner ids are displayed zero-padded (for example 002) but must be passed without the leading zeros (2).\n"
-        + "SMILE_BASE_URL (or --base-url) points the SDK at a host such as https://devapi.smileidentity.com; without it the sandbox is used.\n"
+        + "SMILE_BASE_URL (or --base-url) points the SDK at a host such as https://your-environment.example.com; without it the sandbox is used.\n"
         + "Non-production environments match test identities on given names, last name and email. An unrecognised identity resolves to block.\n";
   }
 

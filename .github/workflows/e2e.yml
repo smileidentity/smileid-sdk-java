@@ -1,0 +1,51 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    if: github.repository == 'smileidentity/smileid-sdk-java'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: 11
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: Run live e2e test
+        env:
+          SMILE_PARTNER_ID: ${{ secrets.SMILE_PARTNER_ID }}
+          SMILE_API_KEY: ${{ secrets.SMILE_API_KEY }}
+          SMILE_BASE_URL: ${{ secrets.SMILE_E2E_BASE_URL }}
+        run: ./gradlew test --tests '*EndToEndTest*' --rerun-tasks
+      - name: Assert the e2e test actually ran (not silently skipped)
+        if: always()
+        run: |
+          set -euo pipefail
+          report=$(find build/test-results/test -name '*EndToEndTest*.xml' -print -quit 2>/dev/null || true)
+          if [ -z "$report" ]; then
+            echo "no EndToEndTest report found — did the test run?"
+            exit 1
+          fi
+          tests=$(grep -oh 'tests="[0-9]*"' "$report" | head -1 | grep -o '[0-9]*')
+          skipped=$(grep -oh 'skipped="[0-9]*"' "$report" | head -1 | grep -o '[0-9]*')
+          echo "tests=$tests skipped=$skipped"
+          if [ "${tests:-0}" -lt 1 ] || [ "${skipped:-0}" -gt 0 ]; then
+            echo "EndToEndTest skipped or did not run — check that secrets are set"
+            exit 1
+          fi

@@ -175,7 +175,7 @@ class WaitUntilCompleteTest {
   void defaultOptionsExist() {
     WaitOptions defaults = WaitOptions.defaults();
     assertEquals(Duration.ofSeconds(2), defaults.getInterval());
-    assertEquals(Duration.ofSeconds(60), defaults.getTimeout());
+    assertEquals(Duration.ofSeconds(120), defaults.getTimeout());
     assertTrue(defaults.isTreatNotFoundAsPending());
   }
 }

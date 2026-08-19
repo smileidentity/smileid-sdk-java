@@ -71,7 +71,7 @@ Partner ids are displayed zero-padded in the portal (for example 002) but must b
 SmileID smile = SmileID.builder()
     .partnerId("2")
     .apiKey(System.getenv("SMILE_API_KEY"))
-    .baseUrl("https://devapi.smileidentity.com")
+    .baseUrl("https://your-environment.example.com")
     .build();
 ```
 
@@ -252,7 +252,7 @@ JobStatus done = smile.verifications().waitUntilComplete(
     accepted.getJobId(),
     WaitOptions.builder()
         .interval(Duration.ofSeconds(2))
-        .timeout(Duration.ofSeconds(60))
+        .timeout(Duration.ofSeconds(120))
         .treatNotFoundAsPending(true)
         .build());
 

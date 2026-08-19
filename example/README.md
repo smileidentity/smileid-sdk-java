@@ -22,7 +22,7 @@ includeBuild("..")
 ```bash
 export SMILE_PARTNER_ID="2"
 export SMILE_API_KEY="..."
-export SMILE_BASE_URL="https://devapi.smileidentity.com"
+export SMILE_BASE_URL="https://your-environment.example.com"
 export SMILE_CALLBACK_URL="https://your-app.example.com/smile-callback"
 ```
 

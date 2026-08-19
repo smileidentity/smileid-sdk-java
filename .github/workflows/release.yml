@@ -33,6 +33,19 @@ jobs:
             exit 1
           fi
 
+      - name: Check the tag points at a commit on main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          status="$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...${GITHUB_SHA}" --jq .status)"
+          case "$status" in
+            identical|behind) ;;
+            *)
+              echo "::error::Tag ${GITHUB_REF_NAME} points at a commit that is not on main. Publishing to Maven Central cannot be undone, so tag a merged commit instead."
+              exit 1
+              ;;
+          esac
+
       - name: Check the publishing secrets are set
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}

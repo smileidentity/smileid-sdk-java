@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
@@ -34,14 +34,16 @@ jobs:
           SMILE_BASE_URL: ${{ secrets.SMILE_E2E_BASE_URL }}
         run: ./gradlew test --tests '*EndToEndTest*' --rerun-tasks
       - name: Assert the e2e test actually ran (not silently skipped)
+        if: always()
         run: |
-          report=$(find build/test-results/test -name '*EndToEndTest*.xml')
+          set -euo pipefail
+          report=$(find build/test-results/test -name '*EndToEndTest*.xml' -print -quit 2>/dev/null || true)
           if [ -z "$report" ]; then
             echo "no EndToEndTest report found — did the test run?"
             exit 1
           fi
-          tests=$(grep -o 'tests="[0-9]*"' "$report" | head -1 | grep -o '[0-9]*')
-          skipped=$(grep -o 'skipped="[0-9]*"' "$report" | head -1 | grep -o '[0-9]*')
+          tests=$(grep -oh 'tests="[0-9]*"' "$report" | head -1 | grep -o '[0-9]*')
+          skipped=$(grep -oh 'skipped="[0-9]*"' "$report" | head -1 | grep -o '[0-9]*')
           echo "tests=$tests skipped=$skipped"
           if [ "${tests:-0}" -lt 1 ] || [ "${skipped:-0}" -gt 0 ]; then
             echo "EndToEndTest skipped or did not run — check that secrets are set"

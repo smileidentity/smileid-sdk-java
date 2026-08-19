@@ -27,7 +27,7 @@ jobs:
       - name: Check the tag matches the version in build.gradle.kts
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
-          build_version="$(./gradlew -q properties --property version | awk '/^version:/ { print $2 }')"
+          build_version="$(./gradlew -q properties --property version | awk '/^version: / { print $2 }')"
           if [ "$tag_version" != "$build_version" ]; then
             echo "::error::Tag ${GITHUB_REF_NAME} would publish version ${build_version} from build.gradle.kts. Fix the version or the tag, then try again."
             exit 1

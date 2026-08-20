@@ -28,8 +28,17 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// Compilation always targets Java 11. Tests run on Java 11 by default and CI
+// also runs them on a newer JVM with -PtestJavaVersion, so the compatibility
+// range is covered without tying the Gradle daemon to an old JVM.
 tasks.test {
     useJUnitPlatform()
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            val requested = providers.gradleProperty("testJavaVersion").getOrElse("11")
+            languageVersion.set(JavaLanguageVersion.of(requested.toInt()))
+        },
+    )
 }
 
 spotless {

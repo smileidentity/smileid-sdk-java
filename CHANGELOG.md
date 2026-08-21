@@ -7,42 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Security
+## [12.0.0] - 2026-08-20
 
-- `baseUrl` must now be an absolute https URL with no query or fragment; the
-  builder rejects anything else and there is no insecure override.
-- Callback URLs (`defaultCallbackUrl` and per-request `callbackUrl`) must be
-  https, validated at construction and before send.
-- `job_id` and `user_id` path parameters are percent-encoded as single path
-  segments, so a hostile id cannot alter the request path.
-- Caller-supplied multipart content types are validated before send; invalid
-  values (for example containing CR/LF) raise `ValidationException`. Hostile
-  filenames are covered by tests (OkHttp escapes CR, LF and quotes).
-
-### Changed
-
-- Callback replay now sends its optional body as multipart/form-data (one
-  `callback_url` part), matching the backend; no body is sent when there is
-  no override. It was wrongly specced as JSON, which the backend rejects
-  with 415.
-- A 2xx response whose body is not a JSON object now raises the new
-  `UnexpectedResponseException` instead of a generic parse failure.
-- The offline test suite runs against a TLS MockWebServer (okhttp-tls,
-  test-only dependency).
-- Renamed the Maven artifact from `smile-identity-core` to `usesmileid-java`
-  (`-java` avoids colliding with the Android SDK's coordinates); the
-  coordinates are now `com.smileidentity:usesmileid-java`. The
-  `com.smileidentity` package namespace is unchanged.
-- Set the version to 12.0.0 to align the server SDKs with the V12 mobile SDKs.
+First public release.
 
 ### Added
 
-- Initial implementation of the V3 server-side SDK: all 14 public operations
-  (enhanced KYC, document verification, enhanced document verification,
-  biometric KYC, enrollment, authentication, compare, job status, callback
-  replay, fraud reporting and the four services endpoints).
-- Internal JWT authentication with a thread-safe token cache and a single
-  automatic refresh on 401.
-- Retry policy for idempotent operations only, honouring `Retry-After`.
-- Typed error hierarchy under `com.smileidentity.errors`.
-- `verifications().waitUntilComplete(...)` polling helper.
+- Verification products: Enhanced KYC, Biometric KYC, Document Verification,
+  Enhanced Document Verification, and SmartSelfie enrollment, authentication
+  and compare.
+- Job status retrieval, with a `waitUntilComplete` helper that polls until a
+  job reaches a decision.
+- Callback replay for a job.
+- Fraud reporting, and the bank codes, supported ID types and supported
+  documents lookups.
+- Sandbox and production environments, with a `baseUrl` override for any
+  other Smile ID host.
+- A typed error hierarchy under `com.smileidentity.errors`, one class per
+  HTTP status plus connection and timeout failures.
+
+[Unreleased]: https://github.com/smileidentity/smileid-sdk-java/compare/v12.0.0...HEAD
+[12.0.0]: https://github.com/smileidentity/smileid-sdk-java/releases/tag/v12.0.0

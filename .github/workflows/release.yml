@@ -36,6 +36,13 @@ jobs:
             exit 1
           fi
 
+      - name: Check CHANGELOG.md has an entry for this version
+        run: |
+          if ! grep -qF "## [${GITHUB_REF_NAME#v}]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [${GITHUB_REF_NAME#v}]' heading. Add a changelog entry for this version before tagging a release."
+            exit 1
+          fi
+
       - name: Check the tag points at a commit on main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

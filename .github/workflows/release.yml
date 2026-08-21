@@ -36,6 +36,14 @@ jobs:
             exit 1
           fi
 
+      - name: Check CHANGELOG.md has an entry for this version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! grep -qE "^## \[${version//./\\.}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [${version}]' heading. Add a changelog entry for this version before tagging a release."
+            exit 1
+          fi
+
       - name: Check the tag points at a commit on main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

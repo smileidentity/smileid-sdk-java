@@ -14,6 +14,7 @@ import com.smileidentity.generated.models.EnhancedKycParams;
 import com.smileidentity.generated.models.EnrollParams;
 import com.smileidentity.generated.models.FraudReason;
 import com.smileidentity.generated.models.ReportFraudParams;
+import com.smileidentity.generated.models.ResidencyDocumentVerificationParams;
 import com.smileidentity.generated.models.UserDetails;
 import java.time.Instant;
 import okhttp3.mockwebserver.MockWebServer;
@@ -96,6 +97,33 @@ class ValidationTest {
                         .consent(consent())
                         .build()));
     assertEquals(0, server.getRequestCount(), "id_type is enforced client-side (spec §6.3)");
+  }
+
+  @Test
+  void residencyDocumentVerificationRequiresPassportAndVisaBeforeSending() {
+    java.util.function.BiFunction<String, Boolean, ResidencyDocumentVerificationParams> build =
+        (idType, withVisa) ->
+            ResidencyDocumentVerificationParams.builder()
+                .selfieImage(com.smileidentity.helpers.BinaryInput.of(new byte[] {1}))
+                .document(com.smileidentity.helpers.BinaryInput.of(new byte[] {1}))
+                .visa(withVisa ? com.smileidentity.helpers.BinaryInput.of(new byte[] {1}) : null)
+                .country("ZA")
+                .idType(idType)
+                .userDetails(
+                    UserDetails.builder()
+                        .givenNames("John")
+                        .lastName("Doe")
+                        .email("j@example.com")
+                        .build())
+                .consent(consent())
+                .build();
+    assertThrows(
+        ValidationException.class,
+        () -> smile.documents().verifyResidency(build.apply("DRIVING_LICENCE", true)));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.documents().verifyResidency(build.apply("PASSPORT", false)));
+    assertEquals(0, server.getRequestCount());
   }
 
   @Test

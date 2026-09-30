@@ -3,6 +3,7 @@ package com.smileidentity.client;
 import com.smileidentity.generated.models.AcceptedResponse;
 import com.smileidentity.generated.models.DocumentVerificationParams;
 import com.smileidentity.generated.models.EnhancedDocumentVerificationParams;
+import com.smileidentity.generated.models.ResidencyDocumentVerificationParams;
 import com.smileidentity.generated.operations.DocumentOperations;
 import com.smileidentity.helpers.Validators;
 
@@ -35,5 +36,17 @@ public final class DocumentsResource {
     Validators.requireEmailOrPhone(params.getUserDetails());
     Validators.requireIdType(params.getIdType());
     return DocumentOperations.enhancedDocumentVerification(transport, params, options);
+  }
+
+  /** POST /v3/residency_document_verification — passport plus the visa endorsed in it. */
+  public AcceptedResponse verifyResidency(ResidencyDocumentVerificationParams params) {
+    return verifyResidency(params, RequestOptions.none());
+  }
+
+  public AcceptedResponse verifyResidency(
+      ResidencyDocumentVerificationParams params, RequestOptions options) {
+    Validators.requireEmailOrPhone(params.getUserDetails());
+    Validators.requireResidencyInputs(params.getIdType(), params.getVisa());
+    return DocumentOperations.residencyDocumentVerification(transport, params, options);
   }
 }

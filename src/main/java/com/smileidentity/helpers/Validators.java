@@ -47,6 +47,16 @@ public final class Validators {
     }
   }
 
+  /** Residency document verification needs a visa image and id_type PASSPORT. */
+  public static void requireResidencyInputs(String idType, BinaryInput visa) {
+    if (!"PASSPORT".equals(idType)) {
+      throw new ValidationException("id_type must be PASSPORT for residency document verification");
+    }
+    if (visa == null) {
+      throw new ValidationException("visa is required for residency document verification");
+    }
+  }
+
   /** Images are required on authentication unless use_enrolled_image is true (spec §6.6). */
   public static void validateAuthenticationImages(AuthenticationParams params) {
     if (params.getUserId() == null || params.getUserId().isEmpty()) {

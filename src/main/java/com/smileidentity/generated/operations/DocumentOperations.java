@@ -95,9 +95,7 @@ public final class DocumentOperations {
         parts, "document_back", params.getDocumentBack(), "document_back.jpg");
     OperationSupport.addDocumentBinary(parts, "visa", params.getVisa(), "visa.jpg");
     OperationSupport.addText(parts, "country", params.getCountry());
-    String idType = params.getIdType();
-    OperationSupport.addText(
-        parts, "id_type", idType == null || idType.isEmpty() ? "PASSPORT" : idType);
+    OperationSupport.addText(parts, "id_type", params.getIdType());
     OperationSupport.addUserDetailsAndConsent(parts, params.getUserDetails(), params.getConsent());
     OperationSupport.addText(
         parts,

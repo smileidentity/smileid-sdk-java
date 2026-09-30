@@ -47,6 +47,30 @@ public final class DocumentsResource {
       ResidencyDocumentVerificationParams params, RequestOptions options) {
     Validators.requireEmailOrPhone(params.getUserDetails());
     Validators.requireResidencyInputs(params.getIdType(), params.getVisa());
-    return DocumentOperations.residencyDocumentVerification(transport, params, options);
+    return DocumentOperations.residencyDocumentVerification(
+        transport, withPassportDefault(params), options);
+  }
+
+  // Applied here rather than in generated/ so regeneration cannot drop it.
+  private static ResidencyDocumentVerificationParams withPassportDefault(
+      ResidencyDocumentVerificationParams p) {
+    if (p.getIdType() != null && !p.getIdType().isEmpty()) {
+      return p;
+    }
+    return ResidencyDocumentVerificationParams.builder()
+        .selfieImage(p.getSelfieImage())
+        .livenessImages(p.getLivenessImages())
+        .document(p.getDocument())
+        .documentBack(p.getDocumentBack())
+        .visa(p.getVisa())
+        .consent(p.getConsent())
+        .country(p.getCountry())
+        .idType("PASSPORT")
+        .userDetails(p.getUserDetails())
+        .callbackUrl(p.getCallbackUrl())
+        .partnerParams(p.getPartnerParams())
+        .metadata(p.getMetadata())
+        .userId(p.getUserId())
+        .build();
   }
 }

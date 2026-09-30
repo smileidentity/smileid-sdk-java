@@ -147,7 +147,7 @@ public final class ResidencyDocumentVerificationParams {
       return this;
     }
 
-    /** Required; must be PASSPORT. */
+    /** Optional; PASSPORT is sent when null or empty, and any other value is rejected. */
     public Builder idType(String idType) {
       this.idType = idType;
       return this;

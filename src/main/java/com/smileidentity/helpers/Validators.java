@@ -47,10 +47,11 @@ public final class Validators {
     }
   }
 
-  /** Residency document verification needs a visa image and id_type PASSPORT. */
+  /** Residency document verification needs a visa image; id_type may be omitted (PASSPORT). */
   public static void requireResidencyInputs(String idType, BinaryInput visa) {
-    if (!"PASSPORT".equals(idType)) {
-      throw new ValidationException("id_type must be PASSPORT for residency document verification");
+    if (idType != null && !idType.isEmpty() && !"PASSPORT".equals(idType)) {
+      throw new ValidationException(
+          "id_type must be PASSPORT (or omitted) for residency document verification");
     }
     if (visa == null) {
       throw new ValidationException("visa is required for residency document verification");

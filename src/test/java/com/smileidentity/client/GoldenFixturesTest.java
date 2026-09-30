@@ -385,7 +385,7 @@ class GoldenFixturesTest {
   // ------------------------------------------- residency_document_verification
 
   @Test
-  void residencyDocumentVerificationSendsVisaAndPassport() throws Exception {
+  void residencyDocumentVerificationDefaultsIdTypeToPassport() throws Exception {
     enqueueToken();
     server.enqueue(TestSupport.json(202, ACCEPTED_LOWER));
 
@@ -398,7 +398,6 @@ class GoldenFixturesTest {
                 .document(BinaryInput.of("fake-document".getBytes(StandardCharsets.UTF_8)))
                 .visa(BinaryInput.of("fake-visa".getBytes(StandardCharsets.UTF_8)))
                 .country("ZA")
-                .idType("PASSPORT")
                 .userDetails(johnWithEmail())
                 .consent(goldenConsent())
                 .build());

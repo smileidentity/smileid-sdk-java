@@ -173,7 +173,7 @@ public final class ResidencyDocumentVerificationParams {
       return this;
     }
 
-    /** Sent as the User-ID header . */
+    /** Sent as the User-ID header. */
     public Builder userId(String userId) {
       this.userId = userId;
       return this;

@@ -169,6 +169,25 @@ AcceptedResponse accepted = smile.documents().verifyEnhanced(
         .build());
 ```
 
+### Residency document verification
+
+Passport plus the visa endorsed in it. `visa` is required. `idType` is optional and defaults to `PASSPORT`; any other value throws `ValidationException` before the request is sent. Results take longer than document verification, so rely on the callback. The callback adds an `additional_documents` array with the fields read from the visa.
+
+```java
+import com.smileidentity.generated.models.ResidencyDocumentVerificationParams;
+
+AcceptedResponse accepted = smile.documents().verifyResidency(
+    ResidencyDocumentVerificationParams.builder()
+        .selfieImage(BinaryInput.of(new File("selfie.jpg")))
+        .livenessImages(livenessFrames)
+        .document(BinaryInput.of(new File("passport.jpg")))
+        .visa(BinaryInput.of(new File("visa.jpg")))
+        .country("ZA")                             // idType defaults to PASSPORT
+        .userDetails(user)
+        .consent(consent)
+        .build());
+```
+
 ### Biometric KYC
 
 ```java

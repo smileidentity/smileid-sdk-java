@@ -30,6 +30,7 @@ import com.smileidentity.generated.models.ReplayCallbackResponse;
 import com.smileidentity.generated.models.ReplayParams;
 import com.smileidentity.generated.models.ReportFraudParams;
 import com.smileidentity.generated.models.ReportUserFraudResponse;
+import com.smileidentity.generated.models.ResidencyDocumentVerificationParams;
 import com.smileidentity.generated.models.SupportedDocumentsParams;
 import com.smileidentity.generated.models.UserDetails;
 import com.smileidentity.helpers.BinaryInput;
@@ -378,6 +379,36 @@ class GoldenFixturesTest {
     assertEquals(TestSupport.PARTNER_ID, r.getHeader("SmileID-Partner-ID"));
     List<TestPart> parts = MultipartParser.parse(r);
     assertEquals("PASSPORT", MultipartParser.single(parts, "id_type").body);
+    assertEquals(7, MultipartParser.byName(parts, "liveness_images").size());
+  }
+
+  // ------------------------------------------- residency_document_verification
+
+  @Test
+  void residencyDocumentVerificationDefaultsIdTypeToPassport() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ACCEPTED_LOWER));
+
+    smile
+        .documents()
+        .verifyResidency(
+            ResidencyDocumentVerificationParams.builder()
+                .selfieImage(BinaryInput.of("fake-selfie".getBytes(StandardCharsets.UTF_8)))
+                .livenessImages(livenessImages(7))
+                .document(BinaryInput.of("fake-document".getBytes(StandardCharsets.UTF_8)))
+                .visa(BinaryInput.of("fake-visa".getBytes(StandardCharsets.UTF_8)))
+                .country("ZA")
+                .userDetails(johnWithEmail())
+                .consent(goldenConsent())
+                .build());
+
+    server.takeRequest();
+    RecordedRequest r = server.takeRequest();
+    assertEquals("/v3/residency_document_verification", r.getPath());
+    assertEquals(TestSupport.PARTNER_ID, r.getHeader("SmileID-Partner-ID"));
+    List<TestPart> parts = MultipartParser.parse(r);
+    assertEquals("PASSPORT", MultipartParser.single(parts, "id_type").body);
+    assertEquals("fake-visa", MultipartParser.single(parts, "visa").body);
     assertEquals(7, MultipartParser.byName(parts, "liveness_images").size());
   }
 

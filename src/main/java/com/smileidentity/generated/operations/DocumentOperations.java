@@ -7,13 +7,14 @@ import com.smileidentity.client.Transport;
 import com.smileidentity.generated.models.AcceptedResponse;
 import com.smileidentity.generated.models.DocumentVerificationParams;
 import com.smileidentity.generated.models.EnhancedDocumentVerificationParams;
+import com.smileidentity.generated.models.ResidencyDocumentVerificationParams;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Thin operation functions for POST /v3/document_verification and POST
- * /v3/enhanced_document_verification (spec §6.2, §6.3). Both require the SmileID-Partner-ID header.
- * Not retryable.
+ * /v3/enhanced_document_verification (spec §6.2, §6.3), and POST
+ * /v3/residency_document_verification. All require the SmileID-Partner-ID header. Not retryable.
  */
 public final class DocumentOperations {
 
@@ -74,6 +75,39 @@ public final class DocumentOperations {
         ApiRequest.builder()
             .method("POST")
             .path("/v3/enhanced_document_verification")
+            .authenticated(true)
+            .partnerIdHeader(true)
+            .userIdHeader(params.getUserId())
+            .multipart(parts)
+            .options(options)
+            .build();
+    return transport.execute(request, AcceptedResponse.class);
+  }
+
+  public static AcceptedResponse residencyDocumentVerification(
+      Transport transport, ResidencyDocumentVerificationParams params, RequestOptions options) {
+    List<Part> parts = new ArrayList<>();
+    OperationSupport.addBinary(
+        parts, "selfie_image", params.getSelfieImage(), "selfie.jpg", OperationSupport.IMAGE_JPEG);
+    OperationSupport.addLivenessImages(parts, params.getLivenessImages());
+    OperationSupport.addDocumentBinary(parts, "document", params.getDocument(), "document.jpg");
+    OperationSupport.addDocumentBinary(
+        parts, "document_back", params.getDocumentBack(), "document_back.jpg");
+    OperationSupport.addDocumentBinary(parts, "visa", params.getVisa(), "visa.jpg");
+    OperationSupport.addText(parts, "country", params.getCountry());
+    OperationSupport.addText(parts, "id_type", params.getIdType());
+    OperationSupport.addUserDetailsAndConsent(parts, params.getUserDetails(), params.getConsent());
+    OperationSupport.addText(
+        parts,
+        "callback_url",
+        OperationSupport.effectiveCallbackUrl(transport, params.getCallbackUrl(), options));
+    OperationSupport.addPartnerParamsAndMetadata(
+        parts, params.getPartnerParams(), params.getMetadata());
+
+    ApiRequest request =
+        ApiRequest.builder()
+            .method("POST")
+            .path("/v3/residency_document_verification")
             .authenticated(true)
             .partnerIdHeader(true)
             .userIdHeader(params.getUserId())

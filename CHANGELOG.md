@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* `documents().verifyResidency()` for Residency Document Verification (`POST /v3/residency_document_verification`). `idType` is optional and defaults to `PASSPORT`.
+
 ## [12.0.0] - 2026-08-20
 
 First public release.

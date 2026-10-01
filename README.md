@@ -19,7 +19,7 @@ Not yet published to Maven Central. Once published:
 Gradle:
 
 ```kotlin
-implementation("com.smileidentity:usesmileid-java:12.0.0")
+implementation("com.smileidentity:usesmileid-java:12.1.0")
 ```
 
 Maven:
@@ -28,7 +28,7 @@ Maven:
 <dependency>
   <groupId>com.smileidentity</groupId>
   <artifactId>usesmileid-java</artifactId>
-  <version>12.0.0</version>
+  <version>12.1.0</version>
 </dependency>
 ```
 

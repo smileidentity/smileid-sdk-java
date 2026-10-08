@@ -6,8 +6,7 @@ import java.util.Map;
 
 /**
  * Request parameters for POST /v3/authentication (spec §6.6). {@code userId} is required and
- * travels in the multipart body, not the User-ID header. Images are required unless {@code
- * useEnrolledImage} is true.
+ * travels in the multipart body, not the User-ID header. Selfie and liveness images are required.
  */
 public final class AuthenticationParams {
 
@@ -16,7 +15,6 @@ public final class AuthenticationParams {
   private final List<BinaryInput> livenessImages;
   private final Consent consent;
   private final UserDetails userDetails;
-  private final Boolean useEnrolledImage;
   private final String callbackUrl;
   private final Number sandboxResult;
   private final Map<String, String> partnerParams;
@@ -28,7 +26,6 @@ public final class AuthenticationParams {
     this.livenessImages = b.livenessImages;
     this.consent = b.consent;
     this.userDetails = b.userDetails;
-    this.useEnrolledImage = b.useEnrolledImage;
     this.callbackUrl = b.callbackUrl;
     this.sandboxResult = b.sandboxResult;
     this.partnerParams = b.partnerParams;
@@ -59,10 +56,6 @@ public final class AuthenticationParams {
     return userDetails;
   }
 
-  public Boolean getUseEnrolledImage() {
-    return useEnrolledImage;
-  }
-
   public String getCallbackUrl() {
     return callbackUrl;
   }
@@ -85,7 +78,6 @@ public final class AuthenticationParams {
     private List<BinaryInput> livenessImages;
     private Consent consent;
     private UserDetails userDetails;
-    private Boolean useEnrolledImage;
     private String callbackUrl;
     private Number sandboxResult;
     private Map<String, String> partnerParams;
@@ -114,12 +106,6 @@ public final class AuthenticationParams {
 
     public Builder userDetails(UserDetails userDetails) {
       this.userDetails = userDetails;
-      return this;
-    }
-
-    /** When true, the enrolled image is used and selfie/liveness images are skipped. */
-    public Builder useEnrolledImage(Boolean useEnrolledImage) {
-      this.useEnrolledImage = useEnrolledImage;
       return this;
     }
 

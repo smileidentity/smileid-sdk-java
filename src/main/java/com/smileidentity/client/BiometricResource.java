@@ -26,7 +26,7 @@ public final class BiometricResource {
     return BiometricOperations.registration(transport, params, options);
   }
 
-  /** POST /v3/authentication — user_id required, images required unless useEnrolledImage. */
+  /** POST /v3/authentication — user_id, selfie and liveness images required. */
   public AcceptedResponse authenticate(AuthenticationParams params) {
     return authenticate(params, RequestOptions.none());
   }

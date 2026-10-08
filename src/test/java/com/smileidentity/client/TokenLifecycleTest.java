@@ -1,33 +1,46 @@
 package com.smileidentity.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.smileidentity.client.MultipartParser.TestPart;
 import com.smileidentity.errors.AuthenticationException;
+import com.smileidentity.generated.models.AuthenticationParams;
+import com.smileidentity.generated.models.BiometricKycParams;
+import com.smileidentity.generated.models.Consent;
+import com.smileidentity.generated.models.EnhancedKycParams;
+import com.smileidentity.generated.models.UserDetails;
+import com.smileidentity.helpers.BinaryInput;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.Map;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Spec §2.3/§2A: internal JWT lifecycle. */
+/** Spec §2.3/§2A: one internal token is minted per authenticated request. */
 class TokenLifecycleTest {
 
+  private static final String ACCEPTED =
+      "{\"status\":\"Accepted\",\"job_id\":\"job_x\",\"user_id\":\"user_x\"}";
+  private static final String PROCESSING = "{\"status\":\"processing\",\"job_id\":\"job_x\"}";
+
   private MockWebServer server;
+  private SmileID smile;
 
   @BeforeEach
   void setUp() throws Exception {
     server = TestSupport.tlsServer();
+    smile = TestSupport.client(server);
   }
 
   @AfterEach
@@ -35,13 +48,69 @@ class TokenLifecycleTest {
     server.shutdown();
   }
 
+  private static String freshJwt() {
+    return TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 3600);
+  }
+
+  private static UserDetails user() {
+    return UserDetails.builder()
+        .givenNames("John")
+        .lastName("Doe")
+        .email("john@example.com")
+        .build();
+  }
+
+  private static Consent consent() {
+    return Consent.granted("2026-03-06T12:00:00.000Z", "EN", "https://example.com/privacy");
+  }
+
+  private void enhancedKyc(String userId) {
+    smile
+        .enhancedKyc()
+        .verify(
+            EnhancedKycParams.builder()
+                .country("NG")
+                .idType("NIN")
+                .idNumber("12345678901")
+                .userDetails(user())
+                .consent(consent())
+                .userId(userId)
+                .build());
+  }
+
+  private void enrolledBiometricKyc() {
+    smile
+        .biometricKyc()
+        .verify(
+            BiometricKycParams.builder()
+                .useEnrolledImage(true)
+                .userId("user-1")
+                .country("NG")
+                .idType("NIN")
+                .idNumber("12345678901")
+                .userDetails(user())
+                .consent(consent())
+                .build());
+  }
+
+  private static Map<String, String> claims(RecordedRequest tokenRequest) {
+    Map<String, String> claims = new LinkedHashMap<>();
+    if (tokenRequest.getBodySize() == 0) {
+      return claims;
+    }
+    for (TestPart part : MultipartParser.parse(tokenRequest)) {
+      claims.put(part.name, part.body);
+    }
+    return claims;
+  }
+
   @Test
-  void tokenRequestUsesLowercaseHeadersEmptyBodyAndTelemetry() throws Exception {
-    String jwt = TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 3600);
+  void tokenRequestUsesLowercaseHeadersNoBodyAndTelemetry() throws Exception {
+    String jwt = freshJwt();
     server.enqueue(TestSupport.tokenResponse(jwt));
     server.enqueue(TestSupport.idStatusOk());
 
-    TestSupport.client(server).services().idStatus("NG", "NIN");
+    smile.services().idStatus("NG", "NIN");
 
     RecordedRequest tokenReq = server.takeRequest();
     assertEquals("POST", tokenReq.getMethod());
@@ -55,9 +124,9 @@ class TokenLifecycleTest {
     assertTrue(names.contains("smileid-api-key"), "expected lowercase header, got " + names);
     // Telemetry on every request (§2.4).
     assertEquals("java", tokenReq.getHeader("SmileID-Source-SDK"));
-    assertEquals("12.1.0", tokenReq.getHeader("SmileID-Source-SDK-Version"));
+    assertEquals("12.2.0", tokenReq.getHeader("SmileID-Source-SDK-Version"));
     assertNotNull(tokenReq.getHeader("User-Agent"));
-    assertTrue(tokenReq.getHeader("User-Agent").startsWith("smileid-sdk-java/12.1.0 ("));
+    assertTrue(tokenReq.getHeader("User-Agent").startsWith("smileid-sdk-java/12.2.0 ("));
 
     RecordedRequest statusReq = server.takeRequest();
     assertEquals(jwt, statusReq.getHeader("SmileID-Token"));
@@ -66,131 +135,127 @@ class TokenLifecycleTest {
   }
 
   @Test
-  void cachesTokenAcrossCallsUntilExpiryMinusSkew() throws Exception {
-    String jwt = TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 3600);
-    server.enqueue(TestSupport.tokenResponse(jwt));
-    server.enqueue(TestSupport.idStatusOk());
-    server.enqueue(TestSupport.idStatusOk());
+  void eachJobMintsItsOwnToken() throws Exception {
+    for (int i = 0; i < 3; i++) {
+      server.enqueue(TestSupport.tokenResponse(freshJwt()));
+      server.enqueue(TestSupport.json(202, ACCEPTED));
+    }
 
-    SmileID smile = TestSupport.client(server);
-    smile.services().idStatus("NG", "NIN");
-    smile.services().idStatus("NG", "NIN");
+    enhancedKyc("user-1");
+    enhancedKyc("user-1");
+    enhancedKyc("user-1");
 
-    assertEquals(3, server.getRequestCount());
-    assertEquals("/v3/token", server.takeRequest().getPath());
-    assertTrue(server.takeRequest().getPath().startsWith("/v3/services/id_status"));
-    assertTrue(server.takeRequest().getPath().startsWith("/v3/services/id_status"));
+    assertEquals(6, server.getRequestCount());
+    for (int i = 0; i < 3; i++) {
+      assertEquals("/v3/token", server.takeRequest().getPath());
+      assertEquals("/v3/enhanced_kyc", server.takeRequest().getPath());
+    }
   }
 
   @Test
-  void tokenExpiringWithinSkewIsRefetchedOnNextCall() throws Exception {
-    // exp - 60s is already in the past, so the token is used once and refreshed next call.
-    String shortLived = TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 30);
-    server.enqueue(TestSupport.tokenResponse(shortLived));
-    server.enqueue(TestSupport.idStatusOk());
-    server.enqueue(TestSupport.tokenResponse(shortLived));
-    server.enqueue(TestSupport.idStatusOk());
+  void tokenBindsUserAndProduct() throws Exception {
+    server.enqueue(TestSupport.tokenResponse(freshJwt()));
+    server.enqueue(TestSupport.json(202, ACCEPTED));
 
-    SmileID smile = TestSupport.client(server);
-    smile.services().idStatus("NG", "NIN");
-    smile.services().idStatus("NG", "NIN");
+    enhancedKyc("user-1");
 
-    assertEquals(4, server.getRequestCount());
-    assertEquals("/v3/token", server.takeRequest().getPath());
-    server.takeRequest();
-    assertEquals("/v3/token", server.takeRequest().getPath());
+    Map<String, String> expected = new LinkedHashMap<>();
+    expected.put("user_id", "user-1");
+    expected.put("product", "enhanced_kyc");
+    assertEquals(expected, claims(server.takeRequest()));
   }
 
   @Test
-  void undecodableTokenIsTreatedAsSingleUse() throws Exception {
-    server.enqueue(TestSupport.tokenResponse("opaque-not-a-jwt"));
-    server.enqueue(TestSupport.idStatusOk());
-    server.enqueue(TestSupport.tokenResponse("opaque-not-a-jwt"));
-    server.enqueue(TestSupport.idStatusOk());
+  void tokenBindsBodyUserIdForAuthentication() throws Exception {
+    server.enqueue(TestSupport.tokenResponse(freshJwt()));
+    server.enqueue(TestSupport.json(202, ACCEPTED));
+    List<BinaryInput> liveness = new ArrayList<>();
+    for (int i = 0; i < 6; i++) {
+      liveness.add(BinaryInput.of("fake-liveness".getBytes(StandardCharsets.UTF_8)));
+    }
 
-    SmileID smile = TestSupport.client(server);
-    smile.services().idStatus("NG", "NIN");
-    smile.services().idStatus("NG", "NIN");
+    smile
+        .biometric()
+        .authenticate(
+            AuthenticationParams.builder()
+                .userId("user-1")
+                .selfieImage(BinaryInput.of("fake-selfie".getBytes(StandardCharsets.UTF_8)))
+                .livenessImages(liveness)
+                .userDetails(user())
+                .consent(consent())
+                .build());
 
-    assertEquals(4, server.getRequestCount());
+    Map<String, String> expected = new LinkedHashMap<>();
+    expected.put("user_id", "user-1");
+    expected.put("product", "smart_selfie_authentication");
+    assertEquals(expected, claims(server.takeRequest()));
   }
 
   @Test
-  void refreshesTokenOnceOn401AndRetriesTheCall() throws Exception {
-    String jwt1 = TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 3600);
-    String jwt2 = TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 7200);
-    server.enqueue(TestSupport.tokenResponse(jwt1));
+  void a401IsNotRetried() throws Exception {
+    server.enqueue(TestSupport.tokenResponse(freshJwt()));
     server.enqueue(
         TestSupport.json(
             401,
             "{\"status\":\"Unauthorized\",\"message\":\"Invalid authentication credentials.\"}"));
-    server.enqueue(TestSupport.tokenResponse(jwt2));
-    server.enqueue(TestSupport.idStatusOk());
 
-    TestSupport.client(server).services().idStatus("NG", "NIN");
-
-    assertEquals(4, server.getRequestCount());
-    server.takeRequest(); // token
-    assertEquals(jwt1, server.takeRequest().getHeader("SmileID-Token"));
-    assertEquals("/v3/token", server.takeRequest().getPath());
-    assertEquals(jwt2, server.takeRequest().getHeader("SmileID-Token"));
-  }
-
-  @Test
-  void secondConsecutive401RaisesAuthenticationError() throws Exception {
-    String jwt = TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 3600);
-    String unauthorized =
-        "{\"status\":\"Unauthorized\",\"message\":\"Invalid authentication credentials.\"}";
-    server.enqueue(TestSupport.tokenResponse(jwt));
-    server.enqueue(TestSupport.json(401, unauthorized));
-    server.enqueue(TestSupport.tokenResponse(jwt));
-    server.enqueue(TestSupport.json(401, unauthorized));
-
-    SmileID smile = TestSupport.client(server);
     AuthenticationException e =
-        assertThrows(AuthenticationException.class, () -> smile.services().idStatus("NG", "NIN"));
+        assertThrows(AuthenticationException.class, () -> enhancedKyc("user-1"));
+
     assertEquals(401, e.getStatusCode());
     assertEquals("Invalid authentication credentials.", e.getMessage());
-    assertEquals(4, server.getRequestCount());
+    assertEquals(2, server.getRequestCount());
   }
 
   @Test
-  void concurrentCallsDoNotStampedeTheTokenEndpoint() throws Exception {
-    String jwt = TestSupport.jwtWithExp(Instant.now().getEpochSecond() + 3600);
+  void retriesReuseTheRequestToken() throws Exception {
+    String jwt = freshJwt();
     server.enqueue(TestSupport.tokenResponse(jwt));
-    int threads = 8;
-    for (int i = 0; i < threads; i++) {
-      server.enqueue(TestSupport.idStatusOk());
-    }
+    server.enqueue(TestSupport.json(503, "{\"status\":\"error\",\"message\":\"busy\"}"));
+    server.enqueue(TestSupport.json(200, PROCESSING));
+    smile.transport().setSleeper(millis -> {});
 
-    SmileID smile = TestSupport.client(server);
-    ExecutorService pool = Executors.newFixedThreadPool(threads);
-    CountDownLatch ready = new CountDownLatch(1);
-    List<Future<?>> futures = new ArrayList<>();
-    for (int i = 0; i < threads; i++) {
-      futures.add(
-          pool.submit(
-              () -> {
-                ready.await();
-                smile.services().idStatus("NG", "NIN");
-                return null;
-              }));
-    }
-    ready.countDown();
-    for (Future<?> f : futures) {
-      f.get();
-    }
-    pool.shutdown();
+    smile.verifications().retrieve("job_x");
 
-    int tokenRequests = 0;
-    int total = server.getRequestCount();
-    for (int i = 0; i < total; i++) {
-      if ("/v3/token".equals(server.takeRequest().getPath())) {
-        tokenRequests++;
-      }
-    }
-    assertEquals(1, tokenRequests, "concurrent calls must share a single token fetch");
-    assertEquals(threads + 1, total);
+    assertEquals(3, server.getRequestCount());
+    assertEquals("/v3/token", server.takeRequest().getPath());
+    assertEquals(jwt, server.takeRequest().getHeader("SmileID-Token"));
+    assertEquals(jwt, server.takeRequest().getHeader("SmileID-Token"));
+  }
+
+  @Test
+  void enrolledImageGrantIsBoundToTheBiometricKycToken() throws Exception {
+    server.enqueue(TestSupport.tokenResponse(freshJwt()));
+    server.enqueue(TestSupport.json(202, ACCEPTED));
+
+    enrolledBiometricKyc();
+
+    Map<String, String> expected = new LinkedHashMap<>();
+    expected.put("user_id", "user-1");
+    expected.put("product", "biometric_kyc");
+    expected.put("use_enrolled_image", "true");
+    assertEquals(expected, claims(server.takeRequest()));
+    List<TestPart> jobParts = MultipartParser.parse(server.takeRequest());
+    assertFalse(MultipartParser.has(jobParts, "use_enrolled_image"));
+    assertFalse(MultipartParser.has(jobParts, "selfie_image"));
+    assertFalse(MultipartParser.has(jobParts, "liveness_images"));
+  }
+
+  @Test
+  void grantDoesNotReachLaterRequests() throws Exception {
+    server.enqueue(TestSupport.tokenResponse(freshJwt()));
+    server.enqueue(TestSupport.json(202, ACCEPTED));
+    server.enqueue(TestSupport.tokenResponse(freshJwt()));
+    server.enqueue(TestSupport.json(200, PROCESSING));
+
+    enrolledBiometricKyc();
+    smile.verifications().retrieve("job_x");
+
+    server.takeRequest();
+    server.takeRequest();
+    RecordedRequest laterToken = server.takeRequest();
+    assertEquals("/v3/token", laterToken.getPath());
+    assertTrue(claims(laterToken).isEmpty());
   }
 
   @Test
@@ -199,7 +264,6 @@ class TokenLifecycleTest {
     server.enqueue(TestSupport.json(200, "{\"id_types\":[]}"));
     server.enqueue(TestSupport.json(200, "{\"valid_documents\":[]}"));
 
-    SmileID smile = TestSupport.client(server);
     smile.services().bankCodes();
     smile.services().supportedIdTypes();
     smile.services().supportedDocuments();

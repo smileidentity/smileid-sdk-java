@@ -19,6 +19,7 @@ public final class BiometricKycParams {
   private final Map<String, String> partnerParams;
   private final List<MetadataEntry> metadata;
   private final String userId;
+  private final Boolean useEnrolledImage;
 
   private BiometricKycParams(Builder b) {
     this.selfieImage = b.selfieImage;
@@ -33,6 +34,7 @@ public final class BiometricKycParams {
     this.partnerParams = b.partnerParams;
     this.metadata = b.metadata;
     this.userId = b.userId;
+    this.useEnrolledImage = b.useEnrolledImage;
   }
 
   public static Builder builder() {
@@ -87,6 +89,10 @@ public final class BiometricKycParams {
     return userId;
   }
 
+  public Boolean getUseEnrolledImage() {
+    return useEnrolledImage;
+  }
+
   public static final class Builder {
     private BinaryInput selfieImage;
     private List<BinaryInput> livenessImages;
@@ -100,6 +106,7 @@ public final class BiometricKycParams {
     private Map<String, String> partnerParams;
     private List<MetadataEntry> metadata;
     private String userId;
+    private Boolean useEnrolledImage;
 
     public Builder selfieImage(BinaryInput selfieImage) {
       this.selfieImage = selfieImage;
@@ -160,6 +167,15 @@ public final class BiometricKycParams {
     /** Sent as the User-ID header (spec §6.4). */
     public Builder userId(String userId) {
       this.userId = userId;
+      return this;
+    }
+
+    /**
+     * Verifies against the user's enrolled selfie; requires userId. The grant is bound into the
+     * job's token, so selfie and liveness images may be omitted.
+     */
+    public Builder useEnrolledImage(Boolean useEnrolledImage) {
+      this.useEnrolledImage = useEnrolledImage;
       return this;
     }
 

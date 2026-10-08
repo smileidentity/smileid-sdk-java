@@ -28,6 +28,9 @@ public final class ApiRequest {
   private final boolean idempotent;
   private final boolean notFoundReturnsBody;
   private final RequestOptions options;
+  private final String product;
+  private final String tokenUserId;
+  private final boolean useEnrolledImage;
 
   private ApiRequest(Builder b) {
     this.method = b.method;
@@ -43,6 +46,9 @@ public final class ApiRequest {
     this.idempotent = b.idempotent;
     this.notFoundReturnsBody = b.notFoundReturnsBody;
     this.options = b.options == null ? RequestOptions.none() : b.options;
+    this.product = b.product;
+    this.tokenUserId = b.tokenUserId;
+    this.useEnrolledImage = b.useEnrolledImage;
   }
 
   public static Builder builder() {
@@ -101,6 +107,21 @@ public final class ApiRequest {
     return options;
   }
 
+  /** Product claim bound into this request's token, or null. */
+  public String getProduct() {
+    return product;
+  }
+
+  /** user_id claim bound into this request's token, or null. */
+  public String getTokenUserId() {
+    return tokenUserId;
+  }
+
+  /** Whether this request's token carries the use_enrolled_image grant. */
+  public boolean isUseEnrolledImage() {
+    return useEnrolledImage;
+  }
+
   public static final class Builder {
     private String method = "GET";
     private String path;
@@ -115,6 +136,9 @@ public final class ApiRequest {
     private boolean idempotent;
     private boolean notFoundReturnsBody;
     private RequestOptions options;
+    private String product;
+    private String tokenUserId;
+    private boolean useEnrolledImage;
 
     public Builder method(String method) {
       this.method = method;
@@ -175,6 +199,21 @@ public final class ApiRequest {
 
     public Builder options(RequestOptions options) {
       this.options = options;
+      return this;
+    }
+
+    public Builder product(String product) {
+      this.product = product;
+      return this;
+    }
+
+    public Builder tokenUserId(String tokenUserId) {
+      this.tokenUserId = tokenUserId;
+      return this;
+    }
+
+    public Builder useEnrolledImage(boolean useEnrolledImage) {
+      this.useEnrolledImage = useEnrolledImage;
       return this;
     }
 

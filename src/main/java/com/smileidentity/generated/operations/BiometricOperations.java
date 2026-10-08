@@ -43,6 +43,9 @@ public final class BiometricOperations {
             .method("POST")
             .path("/v3/biometric_kyc")
             .authenticated(true)
+            .product("biometric_kyc")
+            .tokenUserId(params.getUserId())
+            .useEnrolledImage(Boolean.TRUE.equals(params.getUseEnrolledImage()))
             .partnerIdHeader(true)
             .userIdHeader(params.getUserId())
             .multipart(parts)
@@ -72,6 +75,8 @@ public final class BiometricOperations {
             .method("POST")
             .path("/v3/registration")
             .authenticated(true)
+            .product("smart_selfie_registration")
+            .tokenUserId(params.getUserId())
             .userIdHeader(params.getUserId())
             .multipart(parts)
             .options(options)
@@ -88,7 +93,6 @@ public final class BiometricOperations {
         parts, "selfie_image", params.getSelfieImage(), "selfie.jpg", OperationSupport.IMAGE_JPEG);
     OperationSupport.addLivenessImages(parts, params.getLivenessImages());
     OperationSupport.addUserDetailsAndConsent(parts, params.getUserDetails(), params.getConsent());
-    OperationSupport.addBoolean(parts, "use_enrolled_image", params.getUseEnrolledImage());
     OperationSupport.addText(
         parts,
         "callback_url",
@@ -102,6 +106,8 @@ public final class BiometricOperations {
             .method("POST")
             .path("/v3/authentication")
             .authenticated(true)
+            .product("smart_selfie_authentication")
+            .tokenUserId(params.getUserId())
             .multipart(parts)
             .options(options)
             .build();
@@ -141,6 +147,8 @@ public final class BiometricOperations {
             .method("POST")
             .path("/v3/compare")
             .authenticated(true)
+            .product("smart_selfie_compare")
+            .tokenUserId(params.getUserId())
             .multipart(parts)
             .options(options)
             .build();

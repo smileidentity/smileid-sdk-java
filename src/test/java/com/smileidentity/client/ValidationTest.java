@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.smileidentity.errors.InvalidRequestException;
 import com.smileidentity.errors.ValidationException;
 import com.smileidentity.generated.models.AuthenticationParams;
+import com.smileidentity.generated.models.BiometricKycParams;
 import com.smileidentity.generated.models.Consent;
 import com.smileidentity.generated.models.EnhancedDocumentVerificationParams;
 import com.smileidentity.generated.models.EnhancedKycParams;
@@ -150,13 +151,12 @@ class ValidationTest {
                                 .email("john@example.com")
                                 .build())
                         .consent(consent())
-                        .useEnrolledImage(true)
                         .build()));
     assertEquals(0, server.getRequestCount());
   }
 
   @Test
-  void authenticationRequiresImagesUnlessUseEnrolledImage() {
+  void authenticationRequiresImages() {
     assertThrows(
         ValidationException.class,
         () ->
@@ -259,6 +259,56 @@ class ValidationTest {
                         .isFraud(true)
                         .reason(FraudReason.ACCOUNT_TAKEOVER)
                         .build()));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void biometricKycRequiresImagesUnlessUseEnrolledImage() {
+    assertThrows(
+        ValidationException.class,
+        () ->
+            smile
+                .biometricKyc()
+                .verify(
+                    BiometricKycParams.builder()
+                        .country("NG")
+                        .idType("NIN")
+                        .idNumber("12345678901")
+                        .userId("user-1")
+                        .userDetails(
+                            UserDetails.builder()
+                                .givenNames("John")
+                                .lastName("Doe")
+                                .email("john@example.com")
+                                .build())
+                        .consent(consent())
+                        .build()));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void biometricKycEnrolledImageRequiresUserId() {
+    ValidationException e =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                smile
+                    .biometricKyc()
+                    .verify(
+                        BiometricKycParams.builder()
+                            .useEnrolledImage(true)
+                            .country("NG")
+                            .idType("NIN")
+                            .idNumber("12345678901")
+                            .userDetails(
+                                UserDetails.builder()
+                                    .givenNames("John")
+                                    .lastName("Doe")
+                                    .email("john@example.com")
+                                    .build())
+                            .consent(consent())
+                            .build()));
+    assertEquals("user_id is required when use_enrolled_image is true", e.getMessage());
     assertEquals(0, server.getRequestCount());
   }
 }

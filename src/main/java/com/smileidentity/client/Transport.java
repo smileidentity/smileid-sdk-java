@@ -11,6 +11,8 @@ import com.smileidentity.generated.models.TokenResponse;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
@@ -23,8 +25,8 @@ import okio.Buffer;
 
 /**
  * The single transport (spec §2.2). Builds the URL, attaches auth and telemetry headers, serializes
- * the body, sends with the §2.6 retry policy, refreshes the token once on 401, and parses the
- * response or raises a typed error.
+ * the body, mints a token per authenticated request, sends with the §2.6 retry policy, and parses
+ * the response or raises a typed error.
  */
 public final class Transport {
 
@@ -43,7 +45,6 @@ public final class Transport {
   private final String defaultCallbackUrl;
   private final int maxRetries;
   private final ObjectMapper mapper = Json.mapper();
-  private final TokenProvider tokenProvider;
 
   private Sleeper sleeper = Sleeper.DEFAULT;
 
@@ -60,7 +61,6 @@ public final class Transport {
     this.apiKey = apiKey;
     this.defaultCallbackUrl = defaultCallbackUrl;
     this.maxRetries = maxRetries;
-    this.tokenProvider = new TokenProvider(this::fetchToken);
   }
 
   /** Partner id from client config (sent as SmileID-Partner-ID where required). */
@@ -114,10 +114,10 @@ public final class Transport {
   private <T> T send(ApiRequest req, byte[] bodyBytes, MediaType bodyType, Class<T> responseType) {
     HttpUrl url = buildUrl(req);
     OkHttpClient client = clientFor(req);
+    String token = req.isAuthenticated() ? mintToken(req) : null;
     int retries = 0;
-    boolean refreshedOn401 = false;
     while (true) {
-      Request request = buildHttpRequest(req, url, bodyBytes, bodyType);
+      Request request = buildHttpRequest(req, url, bodyBytes, bodyType, token);
       int status;
       String responseBody;
       String requestId;
@@ -134,12 +134,6 @@ public final class Transport {
           continue;
         }
         throw new ConnectionException("Request to " + url + " failed: " + e.getMessage(), e);
-      }
-      if (status == 401 && req.isAuthenticated() && !refreshedOn401) {
-        // Refresh the token once and retry the call once (§2.3 step 5).
-        tokenProvider.invalidate();
-        refreshedOn401 = true;
-        continue;
       }
       if (req.isIdempotent() && retries < maxRetries && RetryPolicy.retryableStatus(status)) {
         backoff(retries, retryAfter);
@@ -174,7 +168,7 @@ public final class Transport {
   }
 
   private Request buildHttpRequest(
-      ApiRequest req, HttpUrl url, byte[] bodyBytes, MediaType bodyType) {
+      ApiRequest req, HttpUrl url, byte[] bodyBytes, MediaType bodyType, String token) {
     Request.Builder rb = new Request.Builder().url(url);
     // Telemetry headers on every request, authenticated or not (§2.4).
     rb.header("SmileID-Source-SDK", "java");
@@ -183,8 +177,8 @@ public final class Transport {
     for (Map.Entry<String, String> h : req.getHeaders().entrySet()) {
       rb.header(h.getKey(), h.getValue());
     }
-    if (req.isAuthenticated()) {
-      rb.header("SmileID-Token", tokenProvider.ensureToken());
+    if (token != null) {
+      rb.header("SmileID-Token", token);
     }
     if (req.isPartnerIdHeader()) {
       rb.header("SmileID-Partner-ID", partnerId);
@@ -284,18 +278,32 @@ public final class Transport {
     }
   }
 
-  /** POST /v3/token with lowercase headers and no body (spec §2.3/§6.0). Retryable. */
-  private String fetchToken() {
-    ApiRequest tokenRequest =
+  /**
+   * POST /v3/token with lowercase headers (spec §2.3/§6.0), minting a token bound to this one
+   * request's user, product and grant. The body carries only the claims that are set. Retryable.
+   */
+  private String mintToken(ApiRequest req) {
+    List<Part> claims = new ArrayList<>();
+    if (req.getTokenUserId() != null) {
+      claims.add(Part.text("user_id", req.getTokenUserId()));
+    }
+    if (req.getProduct() != null) {
+      claims.add(Part.text("product", req.getProduct()));
+    }
+    if (req.isUseEnrolledImage()) {
+      claims.add(Part.text("use_enrolled_image", "true"));
+    }
+    ApiRequest.Builder tokenRequest =
         ApiRequest.builder()
             .method("POST")
             .path("/v3/token")
             .header("smileid-partner-id", partnerId)
             .header("smileid-api-key", apiKey)
-            .idempotent(true)
-            .build();
-    TokenResponse response = execute(tokenRequest, TokenResponse.class);
-    return response.getToken();
+            .idempotent(true);
+    if (!claims.isEmpty()) {
+      tokenRequest.multipart(claims);
+    }
+    return execute(tokenRequest.build(), TokenResponse.class).getToken();
   }
 
   private static String trimTrailingSlash(String url) {

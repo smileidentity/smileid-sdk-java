@@ -446,6 +446,31 @@ class GoldenFixturesTest {
     assertEquals(6, MultipartParser.byName(parts, "liveness_images").size());
   }
 
+  @Test
+  void biometricKycWithEnrolledImageSendsTheGrantOnTheTokenOnly() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ACCEPTED_LOWER));
+
+    smile
+        .biometricKyc()
+        .verifyWithEnrolledImage(
+            BiometricKycParams.builder()
+                .country("NG")
+                .idType("NIN")
+                .idNumber("12345678901")
+                .userDetails(johnWithEmail())
+                .consent(goldenConsent())
+                .userId("user_01h8x9y2z3a4b5c6d7e8f9g0h1")
+                .build());
+
+    List<TestPart> claims = MultipartParser.parse(server.takeRequest());
+    assertEquals("true", MultipartParser.single(claims, "use_enrolled_image").body);
+    List<TestPart> parts = MultipartParser.parse(server.takeRequest());
+    assertFalse(MultipartParser.has(parts, "use_enrolled_image"));
+    assertFalse(MultipartParser.has(parts, "selfie_image"));
+    assertFalse(MultipartParser.has(parts, "liveness_images"));
+  }
+
   // ---------------------------------------------------------------- 6.5 registration
 
   @Test
@@ -503,28 +528,6 @@ class GoldenFixturesTest {
     List<TestPart> parts = MultipartParser.parse(r);
     assertEquals("user_auth_001", MultipartParser.single(parts, "user_id").body);
     assertEquals(6, MultipartParser.byName(parts, "liveness_images").size());
-  }
-
-  @Test
-  void biometricAuthenticateWithEnrolledImageSkipsImages() throws Exception {
-    enqueueToken();
-    server.enqueue(TestSupport.json(202, ACCEPTED_UPPER));
-
-    smile
-        .biometric()
-        .authenticate(
-            AuthenticationParams.builder()
-                .userId("user_auth_001")
-                .useEnrolledImage(true)
-                .userDetails(johnWithEmail())
-                .consent(goldenConsent())
-                .build());
-
-    server.takeRequest();
-    List<TestPart> parts = MultipartParser.parse(server.takeRequest());
-    assertEquals("true", MultipartParser.single(parts, "use_enrolled_image").body);
-    assertFalse(MultipartParser.has(parts, "selfie_image"));
-    assertFalse(MultipartParser.has(parts, "liveness_images"));
   }
 
   // ---------------------------------------------------------------- 6.7 compare

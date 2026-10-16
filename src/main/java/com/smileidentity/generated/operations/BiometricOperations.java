@@ -22,6 +22,13 @@ public final class BiometricOperations {
 
   public static AcceptedResponse biometricKyc(
       Transport transport, BiometricKycParams params, RequestOptions options) {
+    return transport.execute(
+        biometricKycRequest(transport, params, options), AcceptedResponse.class);
+  }
+
+  /** Builds the biometric_kyc request without sending it. */
+  public static ApiRequest biometricKycRequest(
+      Transport transport, BiometricKycParams params, RequestOptions options) {
     List<Part> parts = new ArrayList<>();
     OperationSupport.addBinary(
         parts, "selfie_image", params.getSelfieImage(), "selfie.jpg", OperationSupport.IMAGE_JPEG);
@@ -38,17 +45,15 @@ public final class BiometricOperations {
     OperationSupport.addPartnerParamsAndMetadata(
         parts, params.getPartnerParams(), params.getMetadata());
 
-    ApiRequest request =
-        ApiRequest.builder()
-            .method("POST")
-            .path("/v3/biometric_kyc")
-            .authenticated(true)
-            .partnerIdHeader(true)
-            .userIdHeader(params.getUserId())
-            .multipart(parts)
-            .options(options)
-            .build();
-    return transport.execute(request, AcceptedResponse.class);
+    return ApiRequest.builder()
+        .method("POST")
+        .path("/v3/biometric_kyc")
+        .authenticated(true)
+        .partnerIdHeader(true)
+        .userIdHeader(params.getUserId())
+        .multipart(parts)
+        .options(options)
+        .build();
   }
 
   public static AcceptedResponse registration(
@@ -88,7 +93,6 @@ public final class BiometricOperations {
         parts, "selfie_image", params.getSelfieImage(), "selfie.jpg", OperationSupport.IMAGE_JPEG);
     OperationSupport.addLivenessImages(parts, params.getLivenessImages());
     OperationSupport.addUserDetailsAndConsent(parts, params.getUserDetails(), params.getConsent());
-    OperationSupport.addBoolean(parts, "use_enrolled_image", params.getUseEnrolledImage());
     OperationSupport.addText(
         parts,
         "callback_url",

@@ -11,6 +11,9 @@ import com.smileidentity.generated.models.TokenResponse;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
@@ -23,8 +26,8 @@ import okio.Buffer;
 
 /**
  * The single transport (spec §2.2). Builds the URL, attaches auth and telemetry headers, serializes
- * the body, sends with the §2.6 retry policy, refreshes the token once on 401, and parses the
- * response or raises a typed error.
+ * the body, mints a token per authenticated request, sends with the §2.6 retry policy, and parses
+ * the response or raises a typed error.
  */
 public final class Transport {
 
@@ -36,6 +39,10 @@ public final class Transport {
           + System.getProperty("java.version", "unknown")
           + ")";
 
+  // Mirrors the API authorizer: a token bound to a product is accepted only on that product's
+  // endpoint. Paths absent here mint a token with no claims.
+  private static final Map<String, String> PRODUCT_BY_PATH = productByPath();
+
   private final OkHttpClient http;
   private final String baseUrl;
   private final String partnerId;
@@ -43,7 +50,6 @@ public final class Transport {
   private final String defaultCallbackUrl;
   private final int maxRetries;
   private final ObjectMapper mapper = Json.mapper();
-  private final TokenProvider tokenProvider;
 
   private Sleeper sleeper = Sleeper.DEFAULT;
 
@@ -60,7 +66,6 @@ public final class Transport {
     this.apiKey = apiKey;
     this.defaultCallbackUrl = defaultCallbackUrl;
     this.maxRetries = maxRetries;
-    this.tokenProvider = new TokenProvider(this::fetchToken);
   }
 
   /** Partner id from client config (sent as SmileID-Partner-ID where required). */
@@ -79,6 +84,14 @@ public final class Transport {
   }
 
   public <T> T execute(ApiRequest req, Class<T> responseType) {
+    return execute(req, responseType, false);
+  }
+
+  /**
+   * Executes a request; {@code useEnrolledImage} grants the job's token a captureless Biometric KYC
+   * and is never sent in the job body.
+   */
+  <T> T execute(ApiRequest req, Class<T> responseType, boolean useEnrolledImage) {
     byte[] bodyBytes = null;
     MediaType bodyType = null;
     switch (req.getBodyKind()) {
@@ -108,16 +121,21 @@ public final class Transport {
         }
         break;
     }
-    return send(req, bodyBytes, bodyType, responseType);
+    return send(req, bodyBytes, bodyType, responseType, useEnrolledImage);
   }
 
-  private <T> T send(ApiRequest req, byte[] bodyBytes, MediaType bodyType, Class<T> responseType) {
+  private <T> T send(
+      ApiRequest req,
+      byte[] bodyBytes,
+      MediaType bodyType,
+      Class<T> responseType,
+      boolean useEnrolledImage) {
     HttpUrl url = buildUrl(req);
     OkHttpClient client = clientFor(req);
+    String token = req.isAuthenticated() ? mintToken(req, useEnrolledImage) : null;
     int retries = 0;
-    boolean refreshedOn401 = false;
     while (true) {
-      Request request = buildHttpRequest(req, url, bodyBytes, bodyType);
+      Request request = buildHttpRequest(req, url, bodyBytes, bodyType, token);
       int status;
       String responseBody;
       String requestId;
@@ -134,12 +152,6 @@ public final class Transport {
           continue;
         }
         throw new ConnectionException("Request to " + url + " failed: " + e.getMessage(), e);
-      }
-      if (status == 401 && req.isAuthenticated() && !refreshedOn401) {
-        // Refresh the token once and retry the call once (§2.3 step 5).
-        tokenProvider.invalidate();
-        refreshedOn401 = true;
-        continue;
       }
       if (req.isIdempotent() && retries < maxRetries && RetryPolicy.retryableStatus(status)) {
         backoff(retries, retryAfter);
@@ -174,7 +186,7 @@ public final class Transport {
   }
 
   private Request buildHttpRequest(
-      ApiRequest req, HttpUrl url, byte[] bodyBytes, MediaType bodyType) {
+      ApiRequest req, HttpUrl url, byte[] bodyBytes, MediaType bodyType, String token) {
     Request.Builder rb = new Request.Builder().url(url);
     // Telemetry headers on every request, authenticated or not (§2.4).
     rb.header("SmileID-Source-SDK", "java");
@@ -183,8 +195,8 @@ public final class Transport {
     for (Map.Entry<String, String> h : req.getHeaders().entrySet()) {
       rb.header(h.getKey(), h.getValue());
     }
-    if (req.isAuthenticated()) {
-      rb.header("SmileID-Token", tokenProvider.ensureToken());
+    if (token != null) {
+      rb.header("SmileID-Token", token);
     }
     if (req.isPartnerIdHeader()) {
       rb.header("SmileID-Partner-ID", partnerId);
@@ -284,18 +296,75 @@ public final class Transport {
     }
   }
 
-  /** POST /v3/token with lowercase headers and no body (spec §2.3/§6.0). Retryable. */
-  private String fetchToken() {
-    ApiRequest tokenRequest =
+  /**
+   * POST /v3/token with lowercase headers (spec §2.3/§6.0), minting a token bound to this one
+   * request's user, product and grant. The body carries only the claims that are set. Retryable and
+   * subject to the job's request options.
+   */
+  private String mintToken(ApiRequest req, boolean useEnrolledImage) {
+    String product = PRODUCT_BY_PATH.get(req.getPath());
+    String userId = product == null ? null : jobUserId(req);
+    if (useEnrolledImage && userId == null) {
+      throw new ValidationException("user_id is required when use_enrolled_image is true");
+    }
+    List<Part> claims = new ArrayList<>();
+    if (userId != null) {
+      claims.add(Part.text("user_id", userId));
+    }
+    if (product != null) {
+      claims.add(Part.text("product", product));
+    }
+    if (useEnrolledImage) {
+      claims.add(Part.text("use_enrolled_image", "true"));
+    }
+    ApiRequest.Builder tokenRequest =
         ApiRequest.builder()
             .method("POST")
             .path("/v3/token")
             .header("smileid-partner-id", partnerId)
             .header("smileid-api-key", apiKey)
             .idempotent(true)
-            .build();
-    TokenResponse response = execute(tokenRequest, TokenResponse.class);
-    return response.getToken();
+            .options(req.getOptions());
+    if (!claims.isEmpty()) {
+      tokenRequest.multipart(claims);
+    }
+    String token = execute(tokenRequest.build(), TokenResponse.class).getToken();
+    if (token == null || token.isEmpty()) {
+      throw new UnexpectedResponseException(
+          "Token response did not contain a token", 200, null, null);
+    }
+    return token;
+  }
+
+  // The API trims the User-ID header but not the token's user_id claim, so a padded id would mint
+  // a token for a different user than the job names.
+  private static String jobUserId(ApiRequest req) {
+    String userId = req.getUserIdHeader();
+    if (userId == null) {
+      for (Part part : req.getParts()) {
+        if (part.getKind() == Part.Kind.TEXT && "user_id".equals(part.getName())) {
+          userId = part.getTextValue();
+          break;
+        }
+      }
+    }
+    if (userId != null && (userId.isEmpty() || !userId.equals(userId.trim()))) {
+      throw new ValidationException("user_id must not be empty or padded with whitespace");
+    }
+    return userId;
+  }
+
+  private static Map<String, String> productByPath() {
+    Map<String, String> m = new HashMap<>();
+    m.put("/v3/enhanced_kyc", "enhanced_kyc");
+    m.put("/v3/document_verification", "document_verification");
+    m.put("/v3/enhanced_document_verification", "enhanced_document_verification");
+    m.put("/v3/residency_document_verification", "residency_document_verification");
+    m.put("/v3/biometric_kyc", "biometric_kyc");
+    m.put("/v3/registration", "smart_selfie_registration");
+    m.put("/v3/authentication", "smart_selfie_authentication");
+    m.put("/v3/compare", "smart_selfie_compare");
+    return m;
   }
 
   private static String trimTrailingSlash(String url) {

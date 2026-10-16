@@ -35,8 +35,6 @@ public final class KycOperations {
             .method("POST")
             .path("/v3/enhanced_kyc")
             .authenticated(true)
-            .product("enhanced_kyc")
-            .tokenUserId(params.getUserId())
             .userIdHeader(params.getUserId())
             .multipart(parts)
             .options(options)

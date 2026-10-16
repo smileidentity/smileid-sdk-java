@@ -73,8 +73,9 @@ public final class Validators {
   }
 
   /** Biometric KYC needs user_id when use_enrolled_image is true, otherwise both images. */
-  public static void validateBiometricKycInputs(BiometricKycParams params) {
-    if (Boolean.TRUE.equals(params.getUseEnrolledImage())) {
+  public static void validateBiometricKycInputs(
+      BiometricKycParams params, boolean useEnrolledImage) {
+    if (useEnrolledImage) {
       if (params.getUserId() == null || params.getUserId().isEmpty()) {
         throw new ValidationException("user_id is required when use_enrolled_image is true");
       }

@@ -294,9 +294,8 @@ class ValidationTest {
             () ->
                 smile
                     .biometricKyc()
-                    .verify(
+                    .verifyWithEnrolledImage(
                         BiometricKycParams.builder()
-                            .useEnrolledImage(true)
                             .country("NG")
                             .idType("NIN")
                             .idNumber("12345678901")

@@ -36,7 +36,7 @@ Until then, build from source with `./gradlew build` and use the jar from `build
 
 ## Create a client
 
-Construct one `SmileID` client with your partner id and API key. The SDK manages authentication for you: before each request it fetches a short-lived token from the Smile ID API, bound to that request's user and product. You never handle tokens yourself.
+Construct one `SmileID` client with your partner id and API key. The SDK manages authentication for you: before each request it fetches a short-lived token from the Smile ID API. A verification job's token is bound to that job's product and, when the job names one, its user; other calls get a token with neither. You never handle tokens yourself.
 
 ```java
 import com.smileidentity.client.Environment;
@@ -202,11 +202,10 @@ AcceptedResponse accepted = smile.biometricKyc().verify(BiometricKycParams.build
     .build());
 ```
 
-To verify against a user's enrolled selfie instead of a fresh capture, set `useEnrolledImage(true)` and pass the enrolled `userId`; the selfie and liveness images may then be omitted. `userId` is required in this mode, otherwise `ValidationException` is thrown before the request is sent.
+To verify against a user's enrolled selfie instead of a fresh capture, call `verifyWithEnrolledImage(params)` with the enrolled `userId` set on the params; the selfie and liveness images may then be omitted. `userId` is required in this mode, otherwise `ValidationException` is thrown before the request is sent.
 
 ```java
-AcceptedResponse accepted = smile.biometricKyc().verify(BiometricKycParams.builder()
-    .useEnrolledImage(true)
+AcceptedResponse accepted = smile.biometricKyc().verifyWithEnrolledImage(BiometricKycParams.builder()
     .userId("user-42")
     .country("NG").idType("NIN").idNumber("12345678901")
     .userDetails(user)

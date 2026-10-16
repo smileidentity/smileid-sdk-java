@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 * Each request mints its own token, bound to that request's `userId` and product, instead of reusing one cached token. A 401 is no longer retried with a refreshed token.
+* A `userId` that is empty or padded with whitespace throws `ValidationException` before any request is sent.
+* The `Transport` throws `UnexpectedResponseException` when the token response has no token, and the token request carries the caller's `RequestOptions` timeout.
 
 ### Added
 
-* `BiometricKycParams.useEnrolledImage(true)` with `userId` verifies against the user's enrolled selfie; the grant is bound into the job's token and the selfie and liveness images may be omitted.
+* `BiometricKycResource.verifyWithEnrolledImage(params)` with `userId` verifies against the user's enrolled selfie; the grant is bound into the job's token and the selfie and liveness images may be omitted.
 
 ### Removed
 

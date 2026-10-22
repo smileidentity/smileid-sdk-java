@@ -53,7 +53,9 @@ class WaitUntilCompleteTest {
   void pollsUntilCompleteAndReturnsTheTerminalStatus() throws Exception {
     enqueueToken();
     server.enqueue(TestSupport.json(202, statusBody("processing")));
+    enqueueToken();
     server.enqueue(TestSupport.json(202, statusBody("processing")));
+    enqueueToken();
     server.enqueue(TestSupport.json(200, statusBody("clear")));
 
     JobStatus status =
@@ -68,13 +70,14 @@ class WaitUntilCompleteTest {
 
     assertTrue(status.isComplete());
     assertEquals("clear", status.getStatus());
-    assertEquals(4, server.getRequestCount(), "token + three polls");
+    assertEquals(6, server.getRequestCount(), "a token and a poll, three times");
   }
 
   @Test
   void returnsOnBlockAsWellAsClear() throws Exception {
     enqueueToken();
     server.enqueue(TestSupport.json(202, statusBody("processing")));
+    enqueueToken();
     server.enqueue(TestSupport.json(200, statusBody("block")));
 
     JobStatus status =
@@ -89,7 +92,7 @@ class WaitUntilCompleteTest {
 
     assertTrue(status.isComplete());
     assertEquals("block", status.getStatus());
-    assertEquals(3, server.getRequestCount(), "token + processing poll + block poll");
+    assertEquals(4, server.getRequestCount(), "a token and a poll, twice");
   }
 
   @Test
@@ -135,6 +138,7 @@ class WaitUntilCompleteTest {
   void notFoundIsTreatedAsPendingByDefault() throws Exception {
     enqueueToken();
     server.enqueue(TestSupport.json(404, statusBody("not_found")));
+    enqueueToken();
     server.enqueue(TestSupport.json(200, statusBody("clear")));
 
     JobStatus status =
@@ -148,7 +152,7 @@ class WaitUntilCompleteTest {
                     .build());
 
     assertTrue(status.isComplete());
-    assertEquals(3, server.getRequestCount(), "token + not_found poll + clear poll");
+    assertEquals(4, server.getRequestCount(), "a token and a poll, twice");
   }
 
   @Test

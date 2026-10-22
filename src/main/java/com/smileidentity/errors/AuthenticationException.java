@@ -1,6 +1,6 @@
 package com.smileidentity.errors;
 
-/** HTTP 401: invalid credentials, or a token refresh that failed twice. */
+/** HTTP 401: invalid credentials. */
 public class AuthenticationException extends SmileIDException {
 
   private static final long serialVersionUID = 1L;

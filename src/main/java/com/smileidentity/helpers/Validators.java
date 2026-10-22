@@ -2,6 +2,7 @@ package com.smileidentity.helpers;
 
 import com.smileidentity.errors.ValidationException;
 import com.smileidentity.generated.models.AuthenticationParams;
+import com.smileidentity.generated.models.BiometricKycParams;
 import com.smileidentity.generated.models.FraudReason;
 import com.smileidentity.generated.models.ReportFraudParams;
 import com.smileidentity.generated.models.UserDetails;
@@ -58,20 +59,34 @@ public final class Validators {
     }
   }
 
-  /** Images are required on authentication unless use_enrolled_image is true (spec §6.6). */
+  /** Authentication needs user_id and both selfie and liveness images (spec §6.6). */
   public static void validateAuthenticationImages(AuthenticationParams params) {
     if (params.getUserId() == null || params.getUserId().isEmpty()) {
       throw new ValidationException("user_id is required for authentication");
     }
-    boolean useEnrolled = Boolean.TRUE.equals(params.getUseEnrolledImage());
-    if (!useEnrolled) {
-      if (params.getSelfieImage() == null) {
-        throw new ValidationException("selfie_image is required unless use_enrolled_image is true");
+    if (params.getSelfieImage() == null) {
+      throw new ValidationException("selfie_image is required for authentication");
+    }
+    if (params.getLivenessImages() == null || params.getLivenessImages().isEmpty()) {
+      throw new ValidationException("liveness_images are required for authentication");
+    }
+  }
+
+  /** Biometric KYC needs user_id when use_enrolled_image is true, otherwise both images. */
+  public static void validateBiometricKycInputs(
+      BiometricKycParams params, boolean useEnrolledImage) {
+    if (useEnrolledImage) {
+      if (params.getUserId() == null || params.getUserId().isEmpty()) {
+        throw new ValidationException("user_id is required when use_enrolled_image is true");
       }
-      if (params.getLivenessImages() == null || params.getLivenessImages().isEmpty()) {
-        throw new ValidationException(
-            "liveness_images are required unless use_enrolled_image is true");
-      }
+      return;
+    }
+    if (params.getSelfieImage() == null) {
+      throw new ValidationException("selfie_image is required unless use_enrolled_image is true");
+    }
+    if (params.getLivenessImages() == null || params.getLivenessImages().isEmpty()) {
+      throw new ValidationException(
+          "liveness_images are required unless use_enrolled_image is true");
     }
   }
 

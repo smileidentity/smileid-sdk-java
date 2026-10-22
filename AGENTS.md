@@ -24,6 +24,10 @@ Public method and parameter names are camelCase; wire field names are always ver
 
 Tests are offline and use OkHttp MockWebServer. The end-to-end sandbox test (`EndToEndTest`) skips unless `SMILE_PARTNER_ID` and `SMILE_API_KEY` are set in the environment.
 
+Compilation needs a working JDK 11: the root and `example/` toolchains are both `JavaLanguageVersion.of(11)`. No toolchain download repository is configured, so Gradle will not fetch one, and the build fails with "Cannot find a Java installation ... languageVersion=11". Run `./gradlew javaToolchains` to see which JDKs Gradle found and why it rejected any. For example, on Apple Silicon an x86_64 JDK 11 without Rosetta shows as invalid. Install an arm64 JDK 11, such as Temurin 11, rather than changing the toolchain line. If you do change it locally, do not commit it, and say in the pull request that you did not compile on Java 11.
+
+`-PtestJavaVersion=<n>` only chooses the JVM the tests run on (the default is 11). It does not remove the need for JDK 11. CI runs `./gradlew build test -PtestJavaVersion=11` and `=21`, then `./gradlew -p example build`.
+
 ## Org-wide agent conventions
 
 For agent conventions that apply across Smile ID repositories, see [smileidentity/agents](https://github.com/smileidentity/agents) (private repository, internal contributors only).

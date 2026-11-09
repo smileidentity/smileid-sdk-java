@@ -6,7 +6,7 @@
 
 Official Smile ID server-side SDK for Java — V3 APIs.
 
-This repository is under active development. The SDK is not yet published, and the API surface may change without notice.
+This repository is under active development. Releases follow semantic versioning, so breaking changes only ship in a new major version.
 
 - Group: `com.smileidentity`
 - Artifact: `usesmileid-java`

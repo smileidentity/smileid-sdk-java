@@ -115,6 +115,7 @@ tasks.register<me.champeau.gradle.japicmp.JapicmpTask>("japicmp") {
     newClasspath.from(configurations.runtimeClasspath)
     methodExcludes.set(apiBaselineVersion.map { acceptedBreaks[it].orEmpty() }.orElse(emptyList()))
     onlyModified.set(true)
+    failOnModification.set(true)
     failOnSourceIncompatibility.set(true)
     txtOutputFile.set(layout.buildDirectory.file("reports/japicmp/japicmp.txt"))
     htmlOutputFile.set(layout.buildDirectory.file("reports/japicmp/japicmp.html"))

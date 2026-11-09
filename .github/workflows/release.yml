@@ -52,29 +52,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          previous_tag="$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_SHA}^" 2>/dev/null || true)"
+          # The previous stable tag that is an ancestor of this one, so a
+          # backport tag on an older line sees only its own commits.
+          previous_tag="$(scripts/release-tags.sh last-stable "${GITHUB_SHA}^")"
           if [ -z "$previous_tag" ]; then
-            echo "::notice::No earlier v* tag, so there is no version bump to check."
+            echo "::notice::No earlier vX.Y.Z tag, so there is no version bump to check."
             exit 0
           fi
-          previous_major="${previous_tag#v}"
-          previous_major="${previous_major%%.*}"
-          major="${GITHUB_REF_NAME#v}"
-          major="${major%%.*}"
-          since="$(git log -1 --format=%cI "$previous_tag")"
-          breaking="$(gh pr list --state merged --base main --label breaking \
-            --search "merged:>${since}" --limit 100 --json number,title \
-            --jq '.[] | "#\(.number) \(.title)"')"
+          # Breaking pull requests whose merge commit is in previous_tag..this tag.
+          breaking="$(scripts/release-tags.sh breaking-prs "$previous_tag" "$GITHUB_SHA")"
+          count=0
           if [ -n "$breaking" ]; then
             echo "Pull requests labelled breaking since ${previous_tag}:"
             echo "$breaking"
+            count="$(printf '%s\n' "$breaking" | wc -l | tr -d ' ')"
           fi
-          if [ -n "$breaking" ] && [ "$major" -le "$previous_major" ]; then
-            echo "::error::Pull requests labelled breaking merged since ${previous_tag}, so ${GITHUB_REF_NAME} must be a new major version."
-            exit 1
-          fi
-          if [ -z "$breaking" ] && [ "$major" -gt "$previous_major" ]; then
-            echo "::error::${GITHUB_REF_NAME} is a new major version, but no pull request labelled breaking merged since ${previous_tag}. Label the breaking pull request, or release a minor or patch version."
+          if ! scripts/release-tags.sh check-bump "$previous_tag" "$GITHUB_REF_NAME" "$count"; then
+            echo "::error::${GITHUB_REF_NAME} does not match the breaking pull requests merged since ${previous_tag}. See the message above."
             exit 1
           fi
 

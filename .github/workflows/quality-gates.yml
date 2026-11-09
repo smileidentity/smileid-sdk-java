@@ -40,10 +40,14 @@ jobs:
 
       - name: Find the last release
         id: baseline
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+          # The newest stable tag on the base branch, not the highest tag in the
+          # repository: a maintenance branch compares with its own line.
+          tag="$(scripts/release-tags.sh last-stable "origin/${BASE_REF}")"
           if [ -z "$tag" ]; then
-            echo "::notice::No v* release tag yet, so there is no public API to compare with."
+            echo "::notice::No vX.Y.Z release tag on ${BASE_REF} yet, so there is no public API to compare with."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -70,7 +74,7 @@ jobs:
             echo "::notice::${VERSION} is not on Maven Central. Building the jar from ${TAG}."
             git worktree add "${RUNNER_TEMP}/baseline-src" "$TAG"
             ./gradlew -p "${RUNNER_TEMP}/baseline-src" jar
-            built="$(find "${RUNNER_TEMP}/baseline-src/build/libs" -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
+            built="$(find "${RUNNER_TEMP}/baseline-src/build/libs" -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | awk 'NR == 1')"
             cp "$built" "$jar"
           fi
           echo "path=${jar}" >> "$GITHUB_OUTPUT"
@@ -82,13 +86,19 @@ jobs:
           VERSION: ${{ steps.baseline.outputs.version }}
           JAR: ${{ steps.jar.outputs.path }}
         run: |
+          report=build/reports/japicmp/japicmp.txt
+          rm -f "$report"
           set +e
           ./gradlew japicmp -PapiBaselineVersion="$VERSION" -PapiBaselineJar="$JAR"
           status=$?
           set -e
-          if [ -f build/reports/japicmp/japicmp.txt ]; then
-            cat build/reports/japicmp/japicmp.txt
+          # No report means the build failed before the comparison ran. That is
+          # never an API break, so the breaking label must not excuse it.
+          if [ ! -f "$report" ]; then
+            echo "::error::japicmp produced no report (Gradle exit ${status}). The build failed before the API could be compared."
+            exit 1
           fi
+          cat "$report"
           if [ "$status" -eq 0 ]; then
             echo "The public API is compatible with ${TAG}."
           elif [ "$BREAKING_LABEL" = "true" ]; then
@@ -186,3 +196,5 @@ jobs:
         run: scripts/test/bump-version-test.sh
       - name: Test check-coverage-exclusions.sh
         run: scripts/test/check-coverage-exclusions-test.sh
+      - name: Test release-tags.sh
+        run: scripts/test/release-tags-test.sh

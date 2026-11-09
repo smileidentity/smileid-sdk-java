@@ -114,6 +114,15 @@ printf '# nocov\n' >"$work/scripts/test/fixture.sh"
 commit
 expect_clean "ignores the script's own tests"
 
+setup
+printf 'a\n-- not a header\n' >"$work/src/main/java/com/example/client/Notes.txt"
+git_ add -A
+git_ commit -q -m notes
+printf 'a\n++ src/fake.java\n// nocov\n' >"$work/src/main/java/com/example/client/Notes.txt"
+commit
+expect_hit "an added line starting with '++ ' does not switch the file" \
+  "src/main/java/com/example/client/Notes.txt:3:"
+
 set +e
 (cd "$work" && "$script" >/dev/null 2>&1)
 status_none=$?

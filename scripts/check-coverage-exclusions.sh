@@ -33,6 +33,8 @@ excludes_pattern='<excludes?>|(^|[^A-Za-z0-9_])excludes?([^A-Za-z0-9_]|$)'
 hits=0
 file=""
 line_no=0
+in_hunk=0
+saw_minus=0
 
 report() {
   echo "${file}:${line_no}: $1: $2"
@@ -40,37 +42,58 @@ report() {
 }
 
 # Walk the zero-context diff, tracking the file and the new-side line number.
+# A "+++ " line names a file only when it directly follows a "--- " line
+# outside a hunk; inside a hunk it is an added line that starts with "++ ".
 while IFS= read -r diff_line; do
+  if [ "$in_hunk" -eq 0 ]; then
+    case "$diff_line" in
+      '--- '*)
+        saw_minus=1
+        continue
+        ;;
+      '+++ '*)
+        if [ "$saw_minus" -eq 1 ]; then
+          file="${diff_line#+++ }"
+          file="${file#b/}"
+        fi
+        saw_minus=0
+        continue
+        ;;
+    esac
+  fi
+  saw_minus=0
   case "$diff_line" in
-    '+++ '*)
-      file="${diff_line#+++ }"
-      file="${file#b/}"
+    'diff --git '*)
+      in_hunk=0
       ;;
     '@@ '*)
       # @@ -a,b +c,d @@: the new side starts at line c.
+      in_hunk=1
       new_side="${diff_line#*+}"
       line_no="${new_side%%[, ]*}"
       ;;
     '+'*)
+      [ "$in_hunk" -eq 1 ] || continue
       added="${diff_line#+}"
       case "$file" in
         # This script and its test describe the markers; they do not use them.
         scripts/check-coverage-exclusions.sh | scripts/test/*) ;;
         *)
-          if printf '%s\n' "$added" | grep -Eq "$comment_pattern"; then
+          if [[ "$added" =~ $comment_pattern ]]; then
             report "coverage exclusion comment" "$added"
           fi
           case "$file" in
             */generated/*) ;;
             *.java | *.kt)
-              if printf '%s\n' "$added" | grep -Eq "$generated_pattern"; then
+              if [[ "$added" =~ $generated_pattern ]]; then
                 report "@Generated outside generated/ hides code from JaCoCo" "$added"
               fi
               ;;
           esac
           case "$file" in
             *.gradle | *.gradle.kts | pom.xml | */pom.xml | *jacoco*)
-              if printf '%s\n' "$added" | grep -Eiq "$excludes_pattern"; then
+              lowered="$(printf '%s' "$added" | tr '[:upper:]' '[:lower:]')"
+              if [[ "$lowered" =~ $excludes_pattern ]]; then
                 report "new coverage excludes entry" "$added"
               fi
               ;;

@@ -2,6 +2,8 @@ plugins {
     id("java-library")
     id("com.diffplug.spotless") version "6.25.0"
     id("com.vanniktech.maven.publish") version "0.37.0"
+    id("jacoco")
+    id("me.champeau.gradle.japicmp") version "0.4.6"
 }
 
 group = "com.smileidentity"
@@ -39,6 +41,83 @@ tasks.test {
             languageVersion.set(JavaLanguageVersion.of(requested.toInt()))
         },
     )
+}
+
+// Coverage. The test task writes JaCoCo data; jacocoTestReport turns it into
+// XML (for diff-cover in CI) and HTML. The generated/ tree must keep 100% line
+// and branch coverage, and `check` (so `./gradlew build`) enforces it.
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.test)
+    violationRules {
+        rule {
+            element = "PACKAGE"
+            includes = listOf("com.smileidentity.generated", "com.smileidentity.generated.*")
+            limit {
+                counter = "LINE"
+                minimum = "1.0".toBigDecimal()
+            }
+            limit {
+                counter = "BRANCH"
+                minimum = "1.0".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestReport, tasks.jacocoTestCoverageVerification)
+}
+
+// Public API compatibility. CI passes -PapiBaselineJar with the jar of the
+// last v* release (and -PapiBaselineVersion with its version), and this task
+// fails if the current jar breaks binary or source compatibility with it. Run
+// it locally the same way:
+//   ./gradlew japicmp -PapiBaselineVersion=<version> \
+//       -PapiBaselineJar=/path/to/usesmileid-java-<version>.jar
+val apiBaselineJar = providers.gradleProperty("apiBaselineJar")
+val apiBaselineVersion = providers.gradleProperty("apiBaselineVersion")
+
+// Breaks that were already on main, unreleased, when this check was added.
+// Each list applies only while its version is the baseline, so it stops
+// applying once the next release is tagged. Do not add to this map: label the
+// pull request `breaking` instead.
+val acceptedBreaks =
+    mapOf(
+        // Unreleased since v12.1.0: useEnrolledImage moved from AuthenticationParams
+        // to BiometricKycResource.verifyWithEnrolledImage (see CHANGELOG.md).
+        "12.1.0" to
+            listOf(
+                "com.smileidentity.generated.models.AuthenticationParams#getUseEnrolledImage()",
+                "com.smileidentity.generated.models.AuthenticationParams${'$'}Builder" +
+                    "#useEnrolledImage(java.lang.Boolean)",
+            ),
+    )
+
+tasks.register<me.champeau.gradle.japicmp.JapicmpTask>("japicmp") {
+    description = "Compares the public API with the jar given by -PapiBaselineJar."
+    onlyIf("-PapiBaselineJar is set") { apiBaselineJar.isPresent }
+    oldArchives.from(apiBaselineJar.map { files(it) }.orElse(files()))
+    newArchives.from(tasks.jar)
+    // Resolve OkHttp and Jackson types that appear in signatures.
+    oldClasspath.from(configurations.runtimeClasspath)
+    newClasspath.from(configurations.runtimeClasspath)
+    methodExcludes.set(apiBaselineVersion.map { acceptedBreaks[it].orEmpty() }.orElse(emptyList()))
+    onlyModified.set(true)
+    failOnSourceIncompatibility.set(true)
+    txtOutputFile.set(layout.buildDirectory.file("reports/japicmp/japicmp.txt"))
+    htmlOutputFile.set(layout.buildDirectory.file("reports/japicmp/japicmp.html"))
 }
 
 spotless {

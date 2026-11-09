@@ -15,8 +15,12 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write # create the GitHub release for the tag
+      pull-requests: read # find breaking pull requests since the last release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The breaking-change check needs the previous release tag.
+          fetch-depth: 0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -41,6 +45,36 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           if ! grep -qE "^## \[${version//./\\.}\]" CHANGELOG.md; then
             echo "::error::CHANGELOG.md has no '## [${version}]' heading. Add a changelog entry for this version before tagging a release."
+            exit 1
+          fi
+
+      - name: Check the version bump matches the breaking pull requests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          previous_tag="$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_SHA}^" 2>/dev/null || true)"
+          if [ -z "$previous_tag" ]; then
+            echo "::notice::No earlier v* tag, so there is no version bump to check."
+            exit 0
+          fi
+          previous_major="${previous_tag#v}"
+          previous_major="${previous_major%%.*}"
+          major="${GITHUB_REF_NAME#v}"
+          major="${major%%.*}"
+          since="$(git log -1 --format=%cI "$previous_tag")"
+          breaking="$(gh pr list --state merged --base main --label breaking \
+            --search "merged:>${since}" --limit 100 --json number,title \
+            --jq '.[] | "#\(.number) \(.title)"')"
+          if [ -n "$breaking" ]; then
+            echo "Pull requests labelled breaking since ${previous_tag}:"
+            echo "$breaking"
+          fi
+          if [ -n "$breaking" ] && [ "$major" -le "$previous_major" ]; then
+            echo "::error::Pull requests labelled breaking merged since ${previous_tag}, so ${GITHUB_REF_NAME} must be a new major version."
+            exit 1
+          fi
+          if [ -z "$breaking" ] && [ "$major" -gt "$previous_major" ]; then
+            echo "::error::${GITHUB_REF_NAME} is a new major version, but no pull request labelled breaking merged since ${previous_tag}. Label the breaking pull request, or release a minor or patch version."
             exit 1
           fi
 

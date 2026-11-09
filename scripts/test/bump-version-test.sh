@@ -73,7 +73,10 @@ if out="$(bump patch 2>&1)" && [ "$out" = "12.2.1" ]; then
 else
   fail "patch bump prints the new version (got: $out)"
 fi
-remaining="$(cd "$work" && grep -l '12\.2\.0' "${files[@]}" | grep -v CHANGELOG.md || true)"
+remaining="$(
+  cd "$work"
+  grep -l '12\.2\.0' "${files[@]}" | grep -v CHANGELOG.md
+)" || true
 if [ -z "$remaining" ]; then
   pass "patch bump leaves no old version outside the changelog"
 else

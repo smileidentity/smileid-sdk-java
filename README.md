@@ -6,7 +6,7 @@
 
 Official Smile ID server-side SDK for Java — V3 APIs.
 
-This repository is under active development. The SDK is not yet published, and the API surface may change without notice.
+This repository is under active development. Releases follow semantic versioning, so breaking changes only ship in a new major version.
 
 - Group: `com.smileidentity`
 - Artifact: `usesmileid-java`
@@ -14,12 +14,12 @@ This repository is under active development. The SDK is not yet published, and t
 
 ## Install
 
-Not yet published to Maven Central. Once published:
+The SDK is published to Maven Central as `com.smileidentity:usesmileid-java`.
 
 Gradle:
 
 ```kotlin
-implementation("com.smileidentity:usesmileid-java:12.2.0")
+implementation("com.smileidentity:usesmileid-java:13.0.0")
 ```
 
 Maven:
@@ -28,11 +28,9 @@ Maven:
 <dependency>
   <groupId>com.smileidentity</groupId>
   <artifactId>usesmileid-java</artifactId>
-  <version>12.2.0</version>
+  <version>13.0.0</version>
 </dependency>
 ```
-
-Until then, build from source with `./gradlew build` and use the jar from `build/libs/`.
 
 ## Create a client
 

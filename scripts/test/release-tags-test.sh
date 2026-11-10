@@ -89,7 +89,11 @@ expect_status "check-bump refuses a minor bump with breaks" 1 check-bump v1.9.0 
 expect_status "check-bump refuses a major bump without breaks" 1 check-bump v1.10.0 v2.0.0 0
 expect_status "check-bump allows 0.x to 1.0.0 without breaks" 0 check-bump v0.9.3 v1.0.0 0
 expect_status "check-bump refuses 1.x to 2.0.0 without breaks" 1 check-bump v1.4.0 v2.0.0 0
-expect_status "check-bump rejects a pre-release tag" 2 check-bump v1.0.0 v2.0.0-rc1 1
+expect_status "check-bump allows a major pre-release with breaks" 0 check-bump v1.0.0 v2.0.0-rc1 1
+expect_status "check-bump refuses a minor pre-release with breaks" 1 check-bump v1.0.0 v1.1.0-rc1 1
+expect_status "check-bump refuses a major pre-release without breaks" 1 check-bump v1.0.0 v2.0.0-rc1 0
+expect_status "check-bump rejects a malformed tag" 2 check-bump v1.0.0 v2.0 1
+expect_status "check-bump rejects a pre-release as the previous tag" 2 check-bump v1.0.0-rc1 v1.0.0 0
 expect_status "an unknown command exits 2" 2 nonsense
 
 if [ "$failures" -gt 0 ]; then

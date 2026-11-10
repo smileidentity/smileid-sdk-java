@@ -81,29 +81,13 @@ tasks.check {
 }
 
 // Public API compatibility. CI passes -PapiBaselineJar with the jar of the
-// last v* release (and -PapiBaselineVersion with its version), and this task
+// last vX.Y.Z release, and again with the base branch's jar, and this task
 // fails if the current jar breaks binary or source compatibility with it. Run
 // it locally the same way:
-//   ./gradlew japicmp -PapiBaselineVersion=<version> \
-//       -PapiBaselineJar=/path/to/usesmileid-java-<version>.jar
+//   ./gradlew japicmp -PapiBaselineJar=/path/to/usesmileid-java-<version>.jar
+// Don't exclude methods here to get a break through: label the pull request
+// `breaking` instead.
 val apiBaselineJar = providers.gradleProperty("apiBaselineJar")
-val apiBaselineVersion = providers.gradleProperty("apiBaselineVersion")
-
-// Breaks that were already on main, unreleased, when this check was added.
-// Each list applies only while its version is the baseline, so it stops
-// applying once the next release is tagged. Do not add to this map: label the
-// pull request `breaking` instead.
-val acceptedBreaks =
-    mapOf(
-        // Unreleased since v12.1.0: useEnrolledImage moved from AuthenticationParams
-        // to BiometricKycResource.verifyWithEnrolledImage (see CHANGELOG.md).
-        "12.1.0" to
-            listOf(
-                "com.smileidentity.generated.models.AuthenticationParams#getUseEnrolledImage()",
-                "com.smileidentity.generated.models.AuthenticationParams${'$'}Builder" +
-                    "#useEnrolledImage(java.lang.Boolean)",
-            ),
-    )
 
 tasks.register<me.champeau.gradle.japicmp.JapicmpTask>("japicmp") {
     description = "Compares the public API with the jar given by -PapiBaselineJar."
@@ -113,7 +97,6 @@ tasks.register<me.champeau.gradle.japicmp.JapicmpTask>("japicmp") {
     // Resolve OkHttp and Jackson types that appear in signatures.
     oldClasspath.from(configurations.runtimeClasspath)
     newClasspath.from(configurations.runtimeClasspath)
-    methodExcludes.set(apiBaselineVersion.map { acceptedBreaks[it].orEmpty() }.orElse(emptyList()))
     onlyModified.set(true)
     failOnModification.set(true)
     failOnSourceIncompatibility.set(true)

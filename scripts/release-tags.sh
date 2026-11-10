@@ -13,7 +13,8 @@
 #   scripts/release-tags.sh check-bump <previous-tag> <tag> <breaking-count>
 #       Fails if <breaking-count> breaking pull requests merged and the major
 #       version did not increase, or if the major version increased with none.
-#       Going from 0.x to 1.0.0 needs no breaking pull request.
+#       Going from 0.x to 1.0.0 needs no breaking pull request. <tag> may be a
+#       pre-release such as v14.0.0-rc1; the same rule applies to its version.
 set -euo pipefail
 
 usage() {
@@ -22,6 +23,8 @@ usage() {
 }
 
 stable_re='^v[0-9]+\.[0-9]+\.[0-9]+$'
+# A release tag, which may carry a pre-release suffix such as -rc1.
+release_re='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
 
 last_stable() {
   local ref="$1"
@@ -65,8 +68,8 @@ check_bump() {
     echo "error: '${previous}' is not a vX.Y.Z tag" >&2
     exit 2
   }
-  [[ "$tag" =~ $stable_re ]] || {
-    echo "error: '${tag}' is not a vX.Y.Z tag" >&2
+  [[ "$tag" =~ $release_re ]] || {
+    echo "error: '${tag}' is not a vX.Y.Z or vX.Y.Z-<pre-release> tag" >&2
     exit 2
   }
   previous_major="${previous#v}"

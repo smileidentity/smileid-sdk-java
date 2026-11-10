@@ -24,7 +24,7 @@ Public method and parameter names are camelCase; wire field names are always ver
 
 `./gradlew build` fails unless `generated/` has 100% line and branch coverage (JaCoCo). The HTML report is in `build/reports/jacoco/test/html/`. Add tests to close a gap; do not exclude code from coverage.
 
-The `Quality gates` workflow also compares the public API with the last `v*` release (`./gradlew japicmp`, job `api-compat`) and fails on a break unless the pull request is labelled `breaking`. On bot pull requests it also requires 100% coverage of changed lines (`diff-cover`) and no new coverage exclusions (`scripts/check-coverage-exclusions.sh`). `scripts/bump-version.sh <major|minor|patch>` bumps the version and dates the changelog for a release.
+The `Quality gates` workflow also compares the public API with the newest stable `vX.Y.Z` tag that is an ancestor of the base branch (`./gradlew japicmp`, job `api-compat`). It fails on a break the base branch doesn't already have, unless the pull request is labelled `breaking`. On bot pull requests it also requires 100% coverage of changed lines (`diff-cover`) and no new coverage exclusions (`scripts/check-coverage-exclusions.sh`). `scripts/bump-version.sh <major|minor|patch>` bumps the version and dates the changelog for a release.
 
 Tests are offline and use OkHttp MockWebServer. The end-to-end sandbox test (`EndToEndTest`) skips unless `SMILE_PARTNER_ID` and `SMILE_API_KEY` are set in the environment.
 

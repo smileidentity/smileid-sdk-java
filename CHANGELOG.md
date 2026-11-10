@@ -7,21 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [12.2.0] - 2026-10-08
+## [13.0.0] - 2026-11-09
+
+This is a major version because it removes `useEnrolledImage` from `AuthenticationParams`. Version 12.2.0 was never published; its changes are in this release.
+
+### Breaking changes
+
+* `AuthenticationParams.useEnrolledImage` is removed. Send the selfie and liveness images to `biometric().authenticate()`, or use `biometricKyc().verifyWithEnrolledImage(params)` to verify against the enrolled selfie.
+* A `userId` that is empty or has leading or trailing whitespace now throws `ValidationException` before sending. Trim the value before you pass it.
+* A 401 response is no longer retried with a new token. Catch `AuthenticationException` and check your partner ID and API key.
 
 ### Changed
 
-* Each request mints its own token, bound to that request's `userId` and product, instead of reusing one cached token. A 401 is no longer retried with a refreshed token.
-* A `userId` that is empty or padded with whitespace throws `ValidationException` before any request is sent.
+* Each request mints its own token, bound to that request's `userId` and product, instead of reusing one cached token.
 * The `Transport` throws `UnexpectedResponseException` when the token response has no token, and the token request carries the caller's `RequestOptions` timeout.
 
 ### Added
 
 * `BiometricKycResource.verifyWithEnrolledImage(params)` with `userId` verifies against the user's enrolled selfie; the grant is bound into the job's token and the selfie and liveness images may be omitted.
-
-### Removed
-
-* `useEnrolledImage` from `AuthenticationParams`; selfie and liveness images are now always required.
 
 ## [12.1.0] - 2026-10-01
 
@@ -48,7 +51,7 @@ First public release.
 - A typed error hierarchy under `com.smileidentity.errors`, one class per
   HTTP status plus connection and timeout failures.
 
-[Unreleased]: https://github.com/smileidentity/smileid-sdk-java/compare/v12.2.0...HEAD
-[12.2.0]: https://github.com/smileidentity/smileid-sdk-java/compare/v12.1.0...v12.2.0
+[Unreleased]: https://github.com/smileidentity/smileid-sdk-java/compare/v13.0.0...HEAD
+[13.0.0]: https://github.com/smileidentity/smileid-sdk-java/compare/v12.1.0...v13.0.0
 [12.1.0]: https://github.com/smileidentity/smileid-sdk-java/compare/v12.0.0...v12.1.0
 [12.0.0]: https://github.com/smileidentity/smileid-sdk-java/releases/tag/v12.0.0

@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.smileidentity"
-version = "12.2.0"
+version = "13.0.0"
 
 java {
     toolchain {

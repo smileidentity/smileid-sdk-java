@@ -20,6 +20,7 @@ public final class SmileID {
   private final VerificationsResource verifications;
   private final UsersResource users;
   private final ServicesResource services;
+  private final AmlResource aml;
 
   private SmileID(Transport transport) {
     this.transport = transport;
@@ -30,6 +31,7 @@ public final class SmileID {
     this.verifications = new VerificationsResource(transport);
     this.users = new UsersResource(transport);
     this.services = new ServicesResource(transport);
+    this.aml = new AmlResource(transport);
   }
 
   public static Builder builder() {
@@ -69,6 +71,11 @@ public final class SmileID {
   /** The /v3/services endpoints. */
   public ServicesResource services() {
     return services;
+  }
+
+  /** One-Time AML screening and AML Monitoring. */
+  public AmlResource aml() {
+    return aml;
   }
 
   // Internal: exposed for tests in this package.

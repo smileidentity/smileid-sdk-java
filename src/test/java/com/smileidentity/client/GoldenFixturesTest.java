@@ -9,11 +9,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.smileidentity.client.MultipartParser.TestPart;
+import com.smileidentity.errors.ApiException;
 import com.smileidentity.errors.ConflictException;
 import com.smileidentity.errors.InvalidRequestException;
+import com.smileidentity.errors.NotFoundException;
 import com.smileidentity.errors.PaymentRequiredException;
 import com.smileidentity.errors.PermissionException;
+import com.smileidentity.errors.ValidationException;
 import com.smileidentity.generated.models.AcceptedResponse;
+import com.smileidentity.generated.models.AmlMonitoringNewsParams;
+import com.smileidentity.generated.models.AmlMonitoringNewsResponse;
+import com.smileidentity.generated.models.AmlMonitoringParams;
+import com.smileidentity.generated.models.AmlPersonMatch;
 import com.smileidentity.generated.models.AuthenticationParams;
 import com.smileidentity.generated.models.BiometricKycParams;
 import com.smileidentity.generated.models.CompareParams;
@@ -26,6 +33,9 @@ import com.smileidentity.generated.models.EnrollParams;
 import com.smileidentity.generated.models.FraudReason;
 import com.smileidentity.generated.models.JobStatus;
 import com.smileidentity.generated.models.MetadataEntry;
+import com.smileidentity.generated.models.OneTimeAmlAcceptedResponse;
+import com.smileidentity.generated.models.OneTimeAmlCallback;
+import com.smileidentity.generated.models.OneTimeAmlParams;
 import com.smileidentity.generated.models.ReplayCallbackResponse;
 import com.smileidentity.generated.models.ReplayParams;
 import com.smileidentity.generated.models.ReportFraudParams;
@@ -39,6 +49,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -835,6 +846,451 @@ class GoldenFixturesTest {
     assertInstanceOf(PaymentRequiredException.class, e);
     assertEquals(402, e.getStatusCode());
     assertEquals("Insufficient wallet balance.", e.getMessage());
+  }
+
+  // ---------------------------------------------------------------- AML
+
+  private static final String ONE_TIME_ACCEPTED =
+      "{\"status\":\"accepted\",\"message\":\"Job submitted successfully\","
+          + "\"job_id\":\"job_01h8x9y2z3a4b5c6d7e8f9g0h1\","
+          + "\"user_id\":\"user_01h8x9y2z3a4b5c6d7e8f9g0h1\"}";
+
+  private static final String ONE_TIME_RESULT =
+      "{\"status\":\"block\",\"message\":\"Screening completed: potential matches identified.\","
+          + "\"reason\":\"aml_match_found\",\"created_at\":\"2026-07-20T12:00:00.000Z\","
+          + "\"completed_at\":\"2026-07-20T12:00:01.000Z\",\"product\":\"one_time_aml\","
+          + "\"partner_params\":{\"order_id\":\"ORD-1\"},\"kyc_receipt\":\"https://receipts.example.com/r\","
+          + "\"strict_match\":true,\"no_of_persons_found\":2,\"people\":["
+          + "{\"name\":\"Gbenga Afolabi\",\"addresses\":[],\"aliases\":[{\"name\":\"G. Afolabi\"}],"
+          + "\"associations\":[],\"dates_of_birth\":[{\"year\":\"1990\"}],\"enforcement_actions\":[],"
+          + "\"nationalities\":[{\"country\":\"NG\"}],\"sanctions\":[{\"list\":\"OFAC SDN\"}],"
+          + "\"pep\":{\"pep_level\":1,\"political_positions\":[\"Member of Parliament\"],"
+          + "\"sources\":[{\"url\":\"https://example.com\"}]}},"
+          + "{\"name\":\"Bukola Oni\",\"news_summary\":[{\"news_category\":\"financial_crime\","
+          + "\"news_category_label\":\"Financial Crime\",\"number_of_articles\":3}],"
+          + "\"pep\":{\"pep_level\":null,\"political_positions\":[],\"sources\":[]}}],"
+          + "\"user_provided_info\":{\"given_names\":\"Gbenga\",\"last_name\":\"Afolabi\","
+          + "\"email\":\"gbenga@example.com\",\"phone_number\":null},"
+          + "\"consent\":{\"granted\":true},\"antifraud\":{\"fraud_risk_level\":\"low\"},"
+          + "\"device_signals\":{\"ip\":\"203.0.113.1\"}}";
+
+  private static OneTimeAmlParams.Builder goldenOneTime() {
+    return OneTimeAmlParams.builder()
+        .countries(Arrays.asList("NG", "KE"))
+        .fullName("John Doe")
+        .userDetails(johnWithEmail())
+        .consent(goldenConsent());
+  }
+
+  @Test
+  void oneTimeAmlMatchesTheGoldenRequest() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ONE_TIME_ACCEPTED));
+
+    OneTimeAmlAcceptedResponse accepted =
+        smile
+            .aml()
+            .oneTime(
+                goldenOneTime()
+                    .userId("user-1234")
+                    .birthYear("1990")
+                    .strictMatch(false)
+                    .aliases(Arrays.asList("Johnny Doe"))
+                    .searchExistingUser(false)
+                    .callbackUrl("https://example.com/callback")
+                    .partnerParams(Collections.singletonMap("order_id", "ORD-1"))
+                    .metadata(Arrays.asList(new MetadataEntry("k", "v")))
+                    .build());
+
+    RecordedRequest tokenRequest = server.takeRequest();
+    List<TestPart> claims = MultipartParser.parse(tokenRequest);
+    assertEquals("user-1234", MultipartParser.single(claims, "user_id").body);
+    assertEquals("one_time_aml", MultipartParser.single(claims, "product").body);
+    RecordedRequest r = server.takeRequest();
+    assertEquals("POST", r.getMethod());
+    assertEquals("/v3/aml", r.getPath());
+    assertNotNull(r.getHeader("SmileID-Token"));
+    assertNull(r.getHeader("SmileID-Idempotency-Key"));
+
+    List<TestPart> parts = MultipartParser.parse(r);
+    assertEquals("user-1234", MultipartParser.single(parts, "user_id").body);
+    TestPart countries = MultipartParser.single(parts, "countries");
+    assertEquals("application/json", baseType(countries.contentType));
+    assertEquals("[\"NG\",\"KE\"]", countries.body);
+    assertEquals("John Doe", MultipartParser.single(parts, "full_name").body);
+    assertEquals("1990", MultipartParser.single(parts, "birth_year").body);
+    assertEquals("false", MultipartParser.single(parts, "strict_match").body);
+    assertEquals("[\"Johnny Doe\"]", MultipartParser.single(parts, "aliases").body);
+    assertEquals("false", MultipartParser.single(parts, "search_existing_user").body);
+    assertEquals(
+        "{\"given_names\":\"John\",\"last_name\":\"Doe\",\"email\":\"john@example.com\"}",
+        MultipartParser.single(parts, "user_details").body);
+    assertEquals(GOLDEN_CONSENT_JSON, MultipartParser.single(parts, "consent").body);
+    assertEquals(
+        "https://example.com/callback", MultipartParser.single(parts, "callback_url").body);
+    assertEquals("{\"order_id\":\"ORD-1\"}", MultipartParser.single(parts, "partner_params").body);
+    assertEquals(
+        "[{\"name\":\"k\",\"value\":\"v\"}]", MultipartParser.single(parts, "metadata").body);
+
+    assertEquals("accepted", accepted.getStatus());
+    assertEquals("Job submitted successfully", accepted.getMessage());
+    assertEquals(JOB_ID, accepted.getJobId());
+    assertEquals("user_01h8x9y2z3a4b5c6d7e8f9g0h1", accepted.getUserId());
+  }
+
+  @Test
+  void oneTimeAmlOmitsAbsentOptionals() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ONE_TIME_ACCEPTED));
+
+    smile.aml().oneTime(goldenOneTime().build());
+
+    server.takeRequest(); // token
+    List<TestPart> parts = MultipartParser.parse(server.takeRequest());
+    for (String absent :
+        new String[] {
+          "user_id",
+          "birth_year",
+          "strict_match",
+          "aliases",
+          "search_existing_user",
+          "callback_url",
+          "partner_params",
+          "metadata"
+        }) {
+      assertFalse(MultipartParser.has(parts, absent), absent);
+    }
+  }
+
+  @Test
+  void oneTimeAmlSyncParsesTheTerminalResultAndSendsTheIdempotencyKey() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(200, ONE_TIME_RESULT)
+            .setHeader("SmileID-Job-ID", JOB_ID)
+            .setHeader("Response-Signature", "sig"));
+
+    OneTimeAmlCallback result =
+        smile
+            .aml()
+            .oneTimeSync(
+                goldenOneTime().build(), "kuda-onboarding-8f14e45fceea167a", RequestOptions.none());
+
+    server.takeRequest(); // token
+    RecordedRequest r = server.takeRequest();
+    assertEquals("POST", r.getMethod());
+    assertEquals("/v3/aml/sync", r.getPath());
+    assertEquals("kuda-onboarding-8f14e45fceea167a", r.getHeader("SmileID-Idempotency-Key"));
+    List<TestPart> parts = MultipartParser.parse(r);
+    assertEquals("[\"NG\",\"KE\"]", MultipartParser.single(parts, "countries").body);
+    assertFalse(MultipartParser.has(parts, "callback_url"), "callback_url is optional on sync");
+
+    assertEquals("block", result.getStatus());
+    assertEquals("Screening completed: potential matches identified.", result.getMessage());
+    assertEquals("aml_match_found", result.getReason());
+    assertEquals("2026-07-20T12:00:00.000Z", result.getCreatedAt());
+    assertEquals("2026-07-20T12:00:01.000Z", result.getCompletedAt());
+    assertEquals("one_time_aml", result.getProduct());
+    assertEquals("ORD-1", result.getPartnerParams().get("order_id"));
+    assertEquals("https://receipts.example.com/r", result.getKycReceipt());
+    assertEquals(Boolean.TRUE, result.getStrictMatch());
+    assertEquals(Integer.valueOf(2), result.getNoOfPersonsFound());
+    assertEquals(2, result.getPeople().size());
+    AmlPersonMatch gbenga = result.getPeople().get(0);
+    assertEquals("Gbenga Afolabi", gbenga.getName());
+    assertTrue(gbenga.getAddresses().isEmpty());
+    assertEquals("G. Afolabi", gbenga.getAliases().get(0).get("name"));
+    assertTrue(gbenga.getAssociations().isEmpty());
+    assertEquals("1990", gbenga.getDatesOfBirth().get(0).get("year"));
+    assertTrue(gbenga.getEnforcementActions().isEmpty());
+    assertEquals("NG", gbenga.getNationalities().get(0).get("country"));
+    assertEquals("OFAC SDN", gbenga.getSanctions().get(0).get("list"));
+    assertEquals(Integer.valueOf(1), gbenga.getPep().getPepLevel());
+    assertEquals(Arrays.asList("Member of Parliament"), gbenga.getPep().getPoliticalPositions());
+    assertEquals("https://example.com", gbenga.getPep().getSources().get(0).get("url"));
+    assertNull(gbenga.getNewsSummary());
+    AmlPersonMatch bukola = result.getPeople().get(1);
+    assertNull(bukola.getPep().getPepLevel());
+    AmlPersonMatch.NewsSummary news = bukola.getNewsSummary().get(0);
+    assertEquals("financial_crime", news.getNewsCategory());
+    assertEquals("Financial Crime", news.getNewsCategoryLabel());
+    assertEquals(Integer.valueOf(3), news.getNumberOfArticles());
+    OneTimeAmlCallback.UserProvidedInfo info = result.getUserProvidedInfo();
+    assertEquals("Gbenga", info.getGivenNames());
+    assertEquals("Afolabi", info.getLastName());
+    assertEquals("gbenga@example.com", info.getEmail());
+    assertNull(info.getPhoneNumber());
+    assertEquals(Boolean.TRUE, result.getConsent().get("granted"));
+    assertEquals("low", result.getAntifraud().get("fraud_risk_level"));
+    assertEquals("203.0.113.1", result.getDeviceSignals().get("ip"));
+  }
+
+  @Test
+  void oneTimeAmlSyncWithoutAKeyReturnsTheResult() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, ONE_TIME_RESULT));
+
+    OneTimeAmlCallback result = smile.aml().oneTimeSync(goldenOneTime().build());
+
+    assertEquals("block", result.getStatus());
+    server.takeRequest(); // token
+    assertNull(server.takeRequest().getHeader("SmileID-Idempotency-Key"));
+  }
+
+  @Test
+  void oneTimeAmlSyncWithoutAKeyIsNeverRetriedAndSurfacesA408() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+            408,
+            "{\"status\":\"Request Timeout\",\"message\":\"The screening provider timed out.\"}"));
+
+    ApiException e =
+        assertThrows(ApiException.class, () -> smile.aml().oneTimeSync(goldenOneTime().build()));
+
+    assertEquals(408, e.getStatusCode());
+    assertEquals("The screening provider timed out.", e.getMessage());
+    server.takeRequest(); // token
+    RecordedRequest r = server.takeRequest();
+    assertNull(r.getHeader("SmileID-Idempotency-Key"));
+    assertEquals(2, server.getRequestCount());
+  }
+
+  @Test
+  void oneTimeAmlSyncWithAKeyIsRetriedOnA408() throws Exception {
+    smile.transport().setSleeper(millis -> {});
+    enqueueToken();
+    server.enqueue(TestSupport.json(408, "{\"status\":\"Request Timeout\",\"message\":\"slow\"}"));
+    server.enqueue(TestSupport.json(200, ONE_TIME_RESULT));
+
+    OneTimeAmlCallback result =
+        smile
+            .aml()
+            .oneTimeSync(goldenOneTime().build(), "retry-key-0123456789", RequestOptions.none());
+
+    assertEquals("block", result.getStatus());
+    assertEquals(3, server.getRequestCount());
+  }
+
+  @Test
+  void oneTimeAmlRejectsInvalidParamsBeforeSending() {
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().oneTime(goldenOneTime().countries(null).build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().oneTime(goldenOneTime().countries(new ArrayList<>()).build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().oneTime(goldenOneTime().fullName(" ").build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().oneTime(goldenOneTime().fullName(null).build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().oneTime(goldenOneTime().consent(null).build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().oneTime(goldenOneTime().userDetails(null).build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().oneTime(goldenOneTime().callbackUrl("http://example.com/cb").build()));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  private static AmlMonitoringParams.Builder goldenMonitoring() {
+    return AmlMonitoringParams.builder()
+        .countries(Arrays.asList("NG", "GH"))
+        .fullName("Jane Doe")
+        .userDetails(johnWithPhone())
+        .consent(goldenConsent());
+  }
+
+  @Test
+  void amlMonitoringMatchesTheGoldenRequest() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ACCEPTED_LOWER));
+
+    AcceptedResponse accepted =
+        smile
+            .aml()
+            .monitoring(
+                goldenMonitoring()
+                    .userId("user_01h8x9y2z3a4b5c6d7e8f9g0h1")
+                    .birthYear("1990")
+                    .strictMatch(true)
+                    .aliases(Arrays.asList("J. Doe"))
+                    .searchExistingUser(false)
+                    .callbackUrl("https://example.com/callback")
+                    .partnerParams(Collections.singletonMap("order_id", "ORD-12345"))
+                    .metadata(Arrays.asList(new MetadataEntry("k", "v")))
+                    .build());
+
+    server.takeRequest(); // token
+    RecordedRequest r = server.takeRequest();
+    assertEquals("POST", r.getMethod());
+    assertEquals("/v3/aml/monitoring", r.getPath());
+    assertNotNull(r.getHeader("SmileID-Token"));
+    List<TestPart> parts = MultipartParser.parse(r);
+    assertEquals("user_01h8x9y2z3a4b5c6d7e8f9g0h1", MultipartParser.single(parts, "user_id").body);
+    assertEquals("[\"NG\",\"GH\"]", MultipartParser.single(parts, "countries").body);
+    assertEquals("Jane Doe", MultipartParser.single(parts, "full_name").body);
+    assertEquals("1990", MultipartParser.single(parts, "birth_year").body);
+    assertEquals("true", MultipartParser.single(parts, "strict_match").body);
+    assertEquals("[\"J. Doe\"]", MultipartParser.single(parts, "aliases").body);
+    assertEquals("false", MultipartParser.single(parts, "search_existing_user").body);
+    assertEquals(
+        "{\"given_names\":\"John\",\"last_name\":\"Doe\",\"phone_number\":\"+2348012345678\"}",
+        MultipartParser.single(parts, "user_details").body);
+    assertEquals(GOLDEN_CONSENT_JSON, MultipartParser.single(parts, "consent").body);
+    assertEquals(
+        "https://example.com/callback", MultipartParser.single(parts, "callback_url").body);
+    assertEquals(
+        "{\"order_id\":\"ORD-12345\"}", MultipartParser.single(parts, "partner_params").body);
+    assertEquals(
+        "[{\"name\":\"k\",\"value\":\"v\"}]", MultipartParser.single(parts, "metadata").body);
+
+    assertTrue(accepted.isAccepted());
+    assertEquals(JOB_ID, accepted.getJobId());
+    assertEquals("2026-03-10T12:00:00.000Z", accepted.getCreatedAt());
+  }
+
+  @Test
+  void amlMonitoringAllowsAMissingNameWhenSearchingAnExistingUser() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ACCEPTED_LOWER));
+
+    smile
+        .aml()
+        .monitoring(
+            goldenMonitoring().fullName(null).searchExistingUser(true).userId("user-1").build());
+
+    server.takeRequest(); // token
+    List<TestPart> parts = MultipartParser.parse(server.takeRequest());
+    assertFalse(MultipartParser.has(parts, "full_name"));
+    assertEquals("true", MultipartParser.single(parts, "search_existing_user").body);
+  }
+
+  @Test
+  void amlMonitoringRejectsInvalidParamsBeforeSending() {
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().monitoring(goldenMonitoring().countries(null).build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().monitoring(goldenMonitoring().countries(new ArrayList<>()).build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().monitoring(goldenMonitoring().fullName("").build()));
+    assertThrows(
+        ValidationException.class,
+        () ->
+            smile
+                .aml()
+                .monitoring(goldenMonitoring().fullName(null).searchExistingUser(false).build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().monitoring(goldenMonitoring().consent(null).build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().monitoring(goldenMonitoring().userDetails(null).build()));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void amlMonitoringNewsIsAnAuthenticatedGetWithQueryParameters() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+            200,
+            "{\"job_id\":\"a1b2c3d4e5\",\"product\":\"aml_monitoring_news\",\"user_id\":\"user_123\","
+                + "\"meta\":{\"current_page\":2,\"limit\":10,\"total_count\":11},\"news\":[{"
+                + "\"body\":\"Sample adverse-media content.\","
+                + "\"published_date\":\"2026-01-15T12:00:00.000Z\","
+                + "\"publisher\":\"Example News Publisher\",\"publisher_country_code\":\"NG\","
+                + "\"title\":\"Sample AML Monitoring News Item\","
+                + "\"url\":\"https://example.com/news/sample\"}]}"));
+
+    AmlMonitoringNewsResponse response =
+        smile
+            .aml()
+            .monitoringNews(
+                "a1b2c3d4e5",
+                "ref_001",
+                AmlMonitoringNewsParams.builder()
+                    .newsCategory("financial_crime")
+                    .page(2)
+                    .limit(10)
+                    .build());
+
+    server.takeRequest(); // token
+    RecordedRequest r = server.takeRequest();
+    assertEquals("GET", r.getMethod());
+    assertEquals(
+        "/v3/aml/monitoring/a1b2c3d4e5/news/ref_001?news_category=financial_crime&page=2&limit=10",
+        r.getPath());
+    assertNotNull(r.getHeader("SmileID-Token"));
+
+    assertEquals("a1b2c3d4e5", response.getJobId());
+    assertEquals("aml_monitoring_news", response.getProduct());
+    assertEquals("user_123", response.getUserId());
+    assertEquals(Integer.valueOf(2), response.getMeta().getCurrentPage());
+    assertEquals(Integer.valueOf(10), response.getMeta().getLimit());
+    assertEquals(Integer.valueOf(11), response.getMeta().getTotalCount());
+    AmlMonitoringNewsResponse.Item item = response.getNews().get(0);
+    assertEquals("Sample adverse-media content.", item.getBody());
+    assertEquals("2026-01-15T12:00:00.000Z", item.getPublishedDate());
+    assertEquals("Example News Publisher", item.getPublisher());
+    assertEquals("NG", item.getPublisherCountryCode());
+    assertEquals("Sample AML Monitoring News Item", item.getTitle());
+    assertEquals("https://example.com/news/sample", item.getUrl());
+  }
+
+  @Test
+  void amlMonitoringNewsOmitsPagingWhenUnsetAndEncodesPathSegments() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, "{\"news\":[]}"));
+
+    smile
+        .aml()
+        .monitoringNews(
+            "job/1",
+            "ref 1",
+            AmlMonitoringNewsParams.builder().newsCategory("other").build(),
+            RequestOptions.none());
+
+    server.takeRequest(); // token
+    assertEquals(
+        "/v3/aml/monitoring/job%2F1/news/ref%201?news_category=other",
+        server.takeRequest().getPath());
+  }
+
+  @Test
+  void amlMonitoringNewsRequiresANewsCategory() {
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().monitoringNews("job", "ref", AmlMonitoringNewsParams.builder().build()));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void amlMonitoringNewsNotFoundRaises() {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+            404, "{\"status\":\"Not Found\",\"message\":\"REF not found for this AML job\"}"));
+
+    NotFoundException e =
+        assertThrows(
+            NotFoundException.class,
+            () ->
+                smile
+                    .aml()
+                    .monitoringNews(
+                        "job",
+                        "ref",
+                        AmlMonitoringNewsParams.builder().newsCategory("other").build()));
+    assertEquals("REF not found for this AML job", e.getMessage());
   }
 
   private static String baseType(String contentType) {

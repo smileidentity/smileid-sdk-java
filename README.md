@@ -149,6 +149,24 @@ AcceptedResponse accepted = smile.documents().verify(DocumentVerificationParams.
     .build());
 ```
 
+### AML screening
+
+```java
+import com.smileidentity.generated.models.OneTimeAmlCallback;
+import com.smileidentity.generated.models.OneTimeAmlParams;
+
+OneTimeAmlCallback result = smile.aml().oneTimeSync(
+    OneTimeAmlParams.builder()
+        .countries(Arrays.asList("NG", "KE"))
+        .fullName("John Doe")
+        .userDetails(UserDetails.builder()
+            .givenNames("John").lastName("Doe").email("john@example.com").build())
+        .consent(Consent.granted("2026-03-06T12:00:00.000Z", "EN", "https://example.com/privacy"))
+        .build());
+```
+
+`smile.aml().oneTime(params)` queues the same screening and delivers the result to your callback URL. `smile.aml().monitoring(params)` enrols the entity for ongoing monitoring, and `smile.aml().monitoringNews(jobId, reference, params)` reads its news media.
+
 ### Enhanced document verification
 
 Same shape as document verification, but `idType` is required:

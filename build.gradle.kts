@@ -2,6 +2,8 @@ plugins {
     id("java-library")
     id("com.diffplug.spotless") version "6.25.0"
     id("com.vanniktech.maven.publish") version "0.37.0"
+    id("jacoco")
+    id("me.champeau.gradle.japicmp") version "0.4.6"
 }
 
 group = "com.smileidentity"
@@ -39,6 +41,67 @@ tasks.test {
             languageVersion.set(JavaLanguageVersion.of(requested.toInt()))
         },
     )
+}
+
+// Coverage. The test task writes JaCoCo data; jacocoTestReport turns it into
+// XML (for diff-cover in CI) and HTML. The generated/ tree must keep 100% line
+// and branch coverage, and `check` (so `./gradlew build`) enforces it.
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.test)
+    violationRules {
+        rule {
+            element = "PACKAGE"
+            includes = listOf("com.smileidentity.generated", "com.smileidentity.generated.*")
+            limit {
+                counter = "LINE"
+                minimum = "1.0".toBigDecimal()
+            }
+            limit {
+                counter = "BRANCH"
+                minimum = "1.0".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestReport, tasks.jacocoTestCoverageVerification)
+}
+
+// Public API compatibility. CI passes -PapiBaselineJar with the jar of the
+// last vX.Y.Z release, and again with the base branch's jar, and this task
+// fails if the current jar breaks binary or source compatibility with it. Run
+// it locally the same way:
+//   ./gradlew japicmp -PapiBaselineJar=/path/to/usesmileid-java-<version>.jar
+// Don't exclude methods here to get a break through: label the pull request
+// `breaking` instead.
+val apiBaselineJar = providers.gradleProperty("apiBaselineJar")
+
+tasks.register<me.champeau.gradle.japicmp.JapicmpTask>("japicmp") {
+    description = "Compares the public API with the jar given by -PapiBaselineJar."
+    onlyIf("-PapiBaselineJar is set") { apiBaselineJar.isPresent }
+    oldArchives.from(apiBaselineJar.map { files(it) }.orElse(files()))
+    newArchives.from(tasks.jar)
+    // Resolve OkHttp and Jackson types that appear in signatures.
+    oldClasspath.from(configurations.runtimeClasspath)
+    newClasspath.from(configurations.runtimeClasspath)
+    onlyModified.set(true)
+    failOnModification.set(true)
+    failOnSourceIncompatibility.set(true)
+    txtOutputFile.set(layout.buildDirectory.file("reports/japicmp/japicmp.txt"))
+    htmlOutputFile.set(layout.buildDirectory.file("reports/japicmp/japicmp.html"))
 }
 
 spotless {

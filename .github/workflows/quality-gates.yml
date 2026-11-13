@@ -1,0 +1,230 @@
+name: Quality gates
+
+on:
+  pull_request:
+    # labeled and unlabeled re-run the gates when someone adds `breaking` or a
+    # bot label.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Bot pull requests must pass the changed-lines coverage and exclusion
+  # checks. Other pull requests run them for information only.
+  BOT_PR: ${{ contains(github.event.pull_request.labels.*.name, 'spec-sync') || contains(github.event.pull_request.labels.*.name, 'parity-port') || contains(github.event.pull_request.labels.*.name, 'release') || endsWith(github.event.pull_request.user.login, '[bot]') }}
+  BREAKING_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'breaking') }}
+
+jobs:
+  api-compat:
+    name: api-compat
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          # Gradle itself runs on the last JDK listed; 11 is the build toolchain.
+          java-version: |
+            11
+            21
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: Find the last release
+        id: baseline
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # The newest stable tag on the base branch, not the highest tag in the
+          # repository: a maintenance branch compares with its own line.
+          tag="$(scripts/release-tags.sh last-stable "origin/${BASE_REF}")"
+          if [ -z "$tag" ]; then
+            echo "::notice::No vX.Y.Z release tag on ${BASE_REF} yet, so there is no public API to compare with."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Comparing with ${tag}"
+          {
+            echo "skip=false"
+            echo "tag=${tag}"
+            echo "version=${tag#v}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Get the released jar
+        id: jar
+        if: steps.baseline.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.baseline.outputs.tag }}
+          VERSION: ${{ steps.baseline.outputs.version }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/baseline"
+          jar="${RUNNER_TEMP}/baseline/usesmileid-java-${VERSION}.jar"
+          url="https://repo1.maven.org/maven2/com/smileidentity/usesmileid-java/${VERSION}/usesmileid-java-${VERSION}.jar"
+          if curl -sSfL -o "$jar" "$url"; then
+            echo "Downloaded ${url}"
+          else
+            echo "::notice::${VERSION} is not on Maven Central. Building the jar from ${TAG}."
+            git worktree add "${RUNNER_TEMP}/baseline-src" "$TAG"
+            ./gradlew -p "${RUNNER_TEMP}/baseline-src" jar
+            built="$(find "${RUNNER_TEMP}/baseline-src/build/libs" -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | awk 'NR == 1')"
+            cp "$built" "$jar"
+          fi
+          echo "path=${jar}" >> "$GITHUB_OUTPUT"
+
+      - name: Compare the public API
+        if: steps.baseline.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.baseline.outputs.tag }}
+          VERSION: ${{ steps.baseline.outputs.version }}
+          JAR: ${{ steps.jar.outputs.path }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          report=build/reports/japicmp/japicmp.txt
+          rm -f "$report"
+          set +e
+          ./gradlew japicmp -PapiBaselineJar="$JAR"
+          status=$?
+          set -e
+          # No report means the build failed before the comparison ran. That is
+          # never an API break, so the breaking label must not excuse it.
+          if [ ! -f "$report" ]; then
+            echo "::error::japicmp produced no report (Gradle exit ${status}). The build failed before the API could be compared."
+            exit 1
+          fi
+          cat "$report"
+          if [ "$status" -eq 0 ]; then
+            echo "The public API is compatible with ${TAG}."
+            exit 0
+          fi
+
+          # The checkout is the merge commit, so it also carries breaks that
+          # already merged to the base branch. Those were judged when they
+          # merged. Compare with the base branch too: only a break the base
+          # branch doesn't have is new. (A change to API that the base branch
+          # added and never released also counts here; label such a PR
+          # breaking only if the API was released.)
+          git worktree add "${RUNNER_TEMP}/base-src" "origin/${BASE_REF}"
+          ./gradlew -p "${RUNNER_TEMP}/base-src" jar
+          base_jar="$(find "${RUNNER_TEMP}/base-src/build/libs" -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | awk 'NR == 1')"
+          cp "$report" build/reports/japicmp/japicmp-release.txt
+          rm -f "$report"
+          set +e
+          ./gradlew japicmp -PapiBaselineJar="$base_jar"
+          base_status=$?
+          set -e
+          if [ ! -f "$report" ]; then
+            echo "::error::japicmp produced no report against ${BASE_REF} (Gradle exit ${base_status})."
+            exit 1
+          fi
+          mv "$report" build/reports/japicmp/japicmp-base.txt
+          if [ "$base_status" -eq 0 ]; then
+            echo "::warning::${BASE_REF} already breaks the public API of ${TAG}. This pull request adds no new break, but the next release needs a major version."
+            exit 0
+          fi
+          echo "Changes compared with ${BASE_REF}:"
+          cat build/reports/japicmp/japicmp-base.txt
+          if [ "$BREAKING_LABEL" = "true" ]; then
+            echo "::warning::This pull request breaks the public API of ${TAG}. It is labelled breaking, so the next release must be a major version."
+          else
+            echo "::error::This pull request breaks the public API of ${TAG}. Keep the old API (deprecate it instead), or label the pull request breaking if the break is intended."
+            exit 1
+          fi
+
+      - name: Upload the API report
+        if: always() && steps.baseline.outputs.skip == 'false'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: api-compat
+          path: build/reports/japicmp/
+          if-no-files-found: ignore
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # diff-cover and the exclusion check compare with the base branch.
+          fetch-depth: 0
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          # Gradle itself runs on the last JDK listed; 11 is the build toolchain.
+          java-version: |
+            11
+            21
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: Run the tests with coverage
+        run: ./gradlew test jacocoTestReport
+
+      - name: Upload the coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: |
+            build/reports/jacoco/test/jacocoTestReport.xml
+            build/reports/jacoco/test/html/
+          if-no-files-found: error
+
+      - name: Check generated/ has 100% line and branch coverage
+        run: ./gradlew jacocoTestCoverageVerification
+
+      - name: Check coverage of changed lines
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set +e
+          pipx run --spec diff-cover==10.6.0 diff-cover build/reports/jacoco/test/jacocoTestReport.xml \
+            --compare-branch="origin/${BASE_REF}" --src-roots src/main/java --fail-under=100
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            if [ "$BOT_PR" = "true" ]; then
+              echo "::error::Bot pull requests must cover every changed line. Add tests for the lines listed above."
+              exit 1
+            fi
+            echo "::notice::Some changed lines are not covered. This fails bot pull requests only."
+          fi
+
+      - name: Check no coverage exclusions were added
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set +e
+          scripts/check-coverage-exclusions.sh "origin/${BASE_REF}"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            if [ "$BOT_PR" = "true" ]; then
+              echo "::error::Bot pull requests may not exclude code from coverage."
+              exit 1
+            fi
+            echo "::notice::This pull request adds coverage exclusions. This fails bot pull requests only."
+          fi
+
+  scripts:
+    name: scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Lint the shell scripts
+        run: shellcheck scripts/*.sh scripts/test/*.sh
+      - name: Test bump-version.sh
+        run: scripts/test/bump-version-test.sh
+      - name: Test check-coverage-exclusions.sh
+        run: scripts/test/check-coverage-exclusions-test.sh
+      - name: Test release-tags.sh
+        run: scripts/test/release-tags-test.sh

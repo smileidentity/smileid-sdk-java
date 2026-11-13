@@ -15,8 +15,12 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write # create the GitHub release for the tag
+      pull-requests: read # find breaking pull requests since the last release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The breaking-change check needs the previous release tag.
+          fetch-depth: 0
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -41,6 +45,30 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           if ! grep -qE "^## \[${version//./\\.}\]" CHANGELOG.md; then
             echo "::error::CHANGELOG.md has no '## [${version}]' heading. Add a changelog entry for this version before tagging a release."
+            exit 1
+          fi
+
+      - name: Check the version bump matches the breaking pull requests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The previous stable tag that is an ancestor of this one, so a
+          # backport tag on an older line sees only its own commits.
+          previous_tag="$(scripts/release-tags.sh last-stable "${GITHUB_SHA}^")"
+          if [ -z "$previous_tag" ]; then
+            echo "::notice::No earlier vX.Y.Z tag, so there is no version bump to check."
+            exit 0
+          fi
+          # Breaking pull requests whose merge commit is in previous_tag..this tag.
+          breaking="$(scripts/release-tags.sh breaking-prs "$previous_tag" "$GITHUB_SHA")"
+          count=0
+          if [ -n "$breaking" ]; then
+            echo "Pull requests labelled breaking since ${previous_tag}:"
+            echo "$breaking"
+            count="$(printf '%s\n' "$breaking" | wc -l | tr -d ' ')"
+          fi
+          if ! scripts/release-tags.sh check-bump "$previous_tag" "$GITHUB_REF_NAME" "$count"; then
+            echo "::error::${GITHUB_REF_NAME} does not match the breaking pull requests merged since ${previous_tag}. See the message above."
             exit 1
           fi
 

@@ -234,4 +234,54 @@ class ModelsTest {
             "{\"status\":\"Accepted\",\"brand_new_field\":42}", AcceptedResponse.class);
     assertTrue(r.isAccepted());
   }
+
+  @Test
+  void acceptedResponseWithoutStatusIsNotAccepted() throws Exception {
+    AcceptedResponse r = mapper.readValue("{}", AcceptedResponse.class);
+    assertFalse(r.isAccepted());
+    assertNull(r.getStatus());
+  }
+
+  @Test
+  void jobStatusExposesTheJobId() throws Exception {
+    JobStatus status =
+        mapper.readValue("{\"status\":\"clear\",\"job_id\":\"job_1\"}", JobStatus.class);
+    assertEquals("job_1", status.getJobId());
+  }
+
+  @Test
+  void supportedIdTypesResponseParsesEveryField() throws Exception {
+    SupportedIdTypesResponse r =
+        mapper.readValue(
+            "{\"id_types\":[{\"bank_code\":\"044\",\"country\":\"NG\",\"label\":\"NIN\","
+                + "\"regex\":\"^[0-9]{11}$\",\"required_fields\":[\"id_number\"],"
+                + "\"type\":\"NIN\"}]}",
+            SupportedIdTypesResponse.class);
+    SupportedIdType idType = r.getIdTypes().get(0);
+    assertEquals("044", idType.getBankCode());
+    assertEquals("NG", idType.getCountry());
+    assertEquals("NIN", idType.getLabel());
+    assertEquals("^[0-9]{11}$", idType.getRegex());
+    assertEquals(Arrays.asList("id_number"), idType.getRequiredFields());
+    assertEquals("NIN", idType.getType());
+  }
+
+  @Test
+  void supportedDocumentsResponseParsesEveryField() throws Exception {
+    SupportedDocumentsResponse r =
+        mapper.readValue(
+            "{\"valid_documents\":[{\"country\":{\"code\":\"NG\",\"name\":\"Nigeria\","
+                + "\"continent\":\"Africa\"},\"id_types\":[{\"code\":\"PASSPORT\","
+                + "\"name\":\"Passport\",\"example\":[\"A12345678\"],\"has_back\":false}]}]}",
+            SupportedDocumentsResponse.class);
+    CountryDocuments documents = r.getValidDocuments().get(0);
+    assertEquals("NG", documents.getCountry().getCode());
+    assertEquals("Nigeria", documents.getCountry().getName());
+    assertEquals("Africa", documents.getCountry().getContinent());
+    DocumentIdType idType = documents.getIdTypes().get(0);
+    assertEquals("PASSPORT", idType.getCode());
+    assertEquals("Passport", idType.getName());
+    assertEquals(Arrays.asList("A12345678"), idType.getExample());
+    assertFalse(idType.getHasBack());
+  }
 }

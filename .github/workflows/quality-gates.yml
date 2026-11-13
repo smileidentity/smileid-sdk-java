@@ -88,7 +88,8 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           report=build/reports/japicmp/japicmp.txt
-          rm -f "$report"
+          html=build/reports/japicmp/japicmp.html
+          rm -f "$report" "$html"
           set +e
           ./gradlew japicmp -PapiBaselineJar="$JAR"
           status=$?
@@ -114,7 +115,9 @@ jobs:
           git worktree add "${RUNNER_TEMP}/base-src" "origin/${BASE_REF}"
           ./gradlew -p "${RUNNER_TEMP}/base-src" jar
           base_jar="$(find "${RUNNER_TEMP}/base-src/build/libs" -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | awk 'NR == 1')"
+          # Keep both runs' reports: the second run writes to the same paths.
           cp "$report" build/reports/japicmp/japicmp-release.txt
+          if [ -f "$html" ]; then mv "$html" build/reports/japicmp/japicmp-release.html; fi
           rm -f "$report"
           set +e
           ./gradlew japicmp -PapiBaselineJar="$base_jar"
@@ -125,6 +128,7 @@ jobs:
             exit 1
           fi
           mv "$report" build/reports/japicmp/japicmp-base.txt
+          if [ -f "$html" ]; then mv "$html" build/reports/japicmp/japicmp-base.html; fi
           if [ "$base_status" -eq 0 ]; then
             echo "::warning::${BASE_REF} already breaks the public API of ${TAG}. This pull request adds no new break, but the next release needs a major version."
             exit 0

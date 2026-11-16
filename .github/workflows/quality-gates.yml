@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           # Gradle itself runs on the last JDK listed; 11 is the build toolchain.
@@ -88,7 +88,8 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           report=build/reports/japicmp/japicmp.txt
-          rm -f "$report"
+          html=build/reports/japicmp/japicmp.html
+          rm -f "$report" "$html"
           set +e
           ./gradlew japicmp -PapiBaselineJar="$JAR"
           status=$?
@@ -114,7 +115,9 @@ jobs:
           git worktree add "${RUNNER_TEMP}/base-src" "origin/${BASE_REF}"
           ./gradlew -p "${RUNNER_TEMP}/base-src" jar
           base_jar="$(find "${RUNNER_TEMP}/base-src/build/libs" -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | awk 'NR == 1')"
+          # Keep both runs' reports: the second run writes to the same paths.
           cp "$report" build/reports/japicmp/japicmp-release.txt
+          if [ -f "$html" ]; then mv "$html" build/reports/japicmp/japicmp-release.html; fi
           rm -f "$report"
           set +e
           ./gradlew japicmp -PapiBaselineJar="$base_jar"
@@ -125,6 +128,7 @@ jobs:
             exit 1
           fi
           mv "$report" build/reports/japicmp/japicmp-base.txt
+          if [ -f "$html" ]; then mv "$html" build/reports/japicmp/japicmp-base.html; fi
           if [ "$base_status" -eq 0 ]; then
             echo "::warning::${BASE_REF} already breaks the public API of ${TAG}. This pull request adds no new break, but the next release needs a major version."
             exit 0
@@ -155,7 +159,7 @@ jobs:
         with:
           # diff-cover and the exclusion check compare with the base branch.
           fetch-depth: 0
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           # Gradle itself runs on the last JDK listed; 11 is the build toolchain.

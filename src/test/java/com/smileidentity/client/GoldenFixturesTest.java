@@ -1126,7 +1126,10 @@ class GoldenFixturesTest {
                     .metadata(Arrays.asList(new MetadataEntry("k", "v")))
                     .build());
 
-    server.takeRequest(); // token
+    RecordedRequest tokenRequest = server.takeRequest();
+    List<TestPart> claims = MultipartParser.parse(tokenRequest);
+    assertEquals("user_01h8x9y2z3a4b5c6d7e8f9g0h1", MultipartParser.single(claims, "user_id").body);
+    assertEquals("aml", MultipartParser.single(claims, "product").body);
     RecordedRequest r = server.takeRequest();
     assertEquals("POST", r.getMethod());
     assertEquals("/v3/aml/monitoring", r.getPath());

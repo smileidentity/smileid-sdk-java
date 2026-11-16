@@ -366,6 +366,7 @@ public final class Transport {
     m.put("/v3/compare", "smart_selfie_compare");
     m.put("/v3/aml", "one_time_aml");
     m.put("/v3/aml/sync", "one_time_aml");
+    m.put("/v3/aml/monitoring", "aml");
     return m;
   }
 

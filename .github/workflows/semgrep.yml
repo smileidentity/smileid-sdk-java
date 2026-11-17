@@ -24,8 +24,8 @@ jobs:
       - name: Run Semgrep
         shell: bash
         run: |
-          # The scan fails the job on a scan error or an ERROR-severity
-          # finding. Lower severities are reported but don't fail it. The
+          # The scan fails the job on a scan error or an ERROR (or CRITICAL
+          # or HIGH) finding. Lower severities are reported but don't fail it. The
           # SARIF keeps every finding for the uploads below.
           status=0
           semgrep scan --config p/security-audit \
@@ -34,9 +34,12 @@ jobs:
             echo "::error::Semgrep exited with status ${status}, so the scan did not finish."
             exit "$status"
           fi
-          blocking="$(python3 -c 'import json; print(sum(r["extra"]["severity"] == "ERROR" for r in json.load(open("semgrep.json"))["results"]))')"
+          if ! blocking="$(python3 -c 'import json; print(sum(r["extra"].get("severity", "").upper() in {"ERROR", "CRITICAL", "HIGH"} for r in json.load(open("semgrep.json"))["results"]))')"; then
+            echo "::error::Could not read Semgrep's JSON output, so the findings could not be checked."
+            exit 1
+          fi
           if [ "$blocking" -gt 0 ]; then
-            echo "::error::Semgrep found ${blocking} ERROR-severity finding(s). Fix them, or add a nosemgrep comment that says why the code is safe."
+            echo "::error::Semgrep found ${blocking} ERROR, CRITICAL or HIGH finding(s). Fix them, or add a nosemgrep comment that says why the code is safe."
             exit 1
           fi
 

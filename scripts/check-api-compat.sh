@@ -32,6 +32,9 @@ baseline_jar() {
     echo "${version} is not on Maven Central. Building the jar from ${tag}." >&2
     src="$(mktemp -d)/src"
     git -C "$repo_root" worktree add -q --detach "$src" "$tag"
+    # Remove the worktree on every exit path, including a failed build.
+    # shellcheck disable=SC2064 # expand $src now, while it is set
+    trap "git -C '$repo_root' worktree remove --force '$src' >/dev/null 2>&1 || true" EXIT
     "${repo_root}/gradlew" -q -p "$src" jar >&2
     built="$(find "${src}/build/libs" -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | awk 'NR == 1')"
     if [ -z "$built" ]; then
@@ -39,7 +42,6 @@ baseline_jar() {
       exit 1
     fi
     cp "$built" "$jar"
-    git -C "$repo_root" worktree remove --force "$src"
   fi
   echo "$jar"
 }

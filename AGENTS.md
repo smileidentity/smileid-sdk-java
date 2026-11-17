@@ -51,7 +51,11 @@ Tests:
 
 `./gradlew build` fails unless `generated/` has 100% line and branch coverage (JaCoCo). The HTML report is in `build/reports/jacoco/test/html/`. Add tests to close a gap; do not exclude code from coverage.
 
-The `Quality gates` workflow also compares the public API with the newest stable `vX.Y.Z` tag that is an ancestor of the base branch (`./gradlew japicmp`, job `api-compat`). It fails on a break the base branch doesn't already have, unless the pull request is labelled `breaking`. On bot pull requests it also requires 100% coverage of changed lines (`diff-cover`) and no new coverage exclusions (`scripts/check-coverage-exclusions.sh`). `scripts/bump-version.sh <major|minor|patch>` bumps the version and dates the changelog for a release.
+The `Quality gates` workflow also compares the public API with the newest stable `vX.Y.Z` tag that is an ancestor of the base branch (job `api-compat`). It fails on a break the base branch doesn't already have, unless the pull request is labelled `breaking`. On bot pull requests it also requires 100% coverage of changed lines (`diff-cover`) and no new coverage exclusions (`scripts/check-coverage-exclusions.sh`).
+
+To run the API comparison locally, use `scripts/check-api-compat.sh`. It finds the last release tag (run `git fetch --tags` first), downloads that release's jar from Maven Central and runs `./gradlew japicmp` against it. A bare `./gradlew japicmp` fails, because it has nothing to compare with. Report the comparison as done only if the script printed which tag it compared with.
+
+`scripts/bump-version.sh <major|minor|patch>` bumps the version and dates the changelog for a release. On a pull request labelled `release`, or on a `release/vX.Y.Z` branch, the `release-guards` job runs `scripts/check-release.sh`: the same checks `release.yml` runs on the tag. Fix any failure before merging, because a pushed tag can't be moved.
 
 Tests are offline and use OkHttp MockWebServer. The end-to-end sandbox test (`EndToEndTest`) skips unless `SMILE_PARTNER_ID` and `SMILE_API_KEY` are set in the environment.
 

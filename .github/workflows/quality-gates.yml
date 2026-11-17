@@ -63,20 +63,10 @@ jobs:
         if: steps.baseline.outputs.skip == 'false'
         env:
           TAG: ${{ steps.baseline.outputs.tag }}
-          VERSION: ${{ steps.baseline.outputs.version }}
         run: |
-          mkdir -p "${RUNNER_TEMP}/baseline"
-          jar="${RUNNER_TEMP}/baseline/usesmileid-java-${VERSION}.jar"
-          url="https://repo1.maven.org/maven2/com/smileidentity/usesmileid-java/${VERSION}/usesmileid-java-${VERSION}.jar"
-          if curl -sSfL -o "$jar" "$url"; then
-            echo "Downloaded ${url}"
-          else
-            echo "::notice::${VERSION} is not on Maven Central. Building the jar from ${TAG}."
-            git worktree add "${RUNNER_TEMP}/baseline-src" "$TAG"
-            ./gradlew -p "${RUNNER_TEMP}/baseline-src" jar
-            built="$(find "${RUNNER_TEMP}/baseline-src/build/libs" -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | awk 'NR == 1')"
-            cp "$built" "$jar"
-          fi
+          # The same jar scripts/check-api-compat.sh uses locally: from Maven
+          # Central, or built from the tag if the version is not there.
+          jar="$(scripts/check-api-compat.sh baseline-jar "$TAG" "${RUNNER_TEMP}/baseline")"
           echo "path=${jar}" >> "$GITHUB_OUTPUT"
 
       - name: Compare the public API
@@ -222,13 +212,59 @@ jobs:
     name: scripts
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      SHELLCHECK_VERSION: v0.11.0
+      SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install ShellCheck
+        run: |
+          # Pinned, so a new ShellCheck on the runner image can't fail this job.
+          curl -sSfL -o "${RUNNER_TEMP}/shellcheck.tar.xz" \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          echo "${SHELLCHECK_SHA256}  ${RUNNER_TEMP}/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf "${RUNNER_TEMP}/shellcheck.tar.xz" -C "$RUNNER_TEMP"
+          echo "${RUNNER_TEMP}/shellcheck-${SHELLCHECK_VERSION}" >> "$GITHUB_PATH"
       - name: Lint the shell scripts
-        run: shellcheck scripts/*.sh scripts/test/*.sh
+        run: |
+          shellcheck --version
+          shellcheck scripts/*.sh scripts/test/*.sh
       - name: Test bump-version.sh
         run: scripts/test/bump-version-test.sh
       - name: Test check-coverage-exclusions.sh
         run: scripts/test/check-coverage-exclusions-test.sh
       - name: Test release-tags.sh
         run: scripts/test/release-tags-test.sh
+      - name: Test check-release.sh
+        run: scripts/test/check-release-test.sh
+
+  # The checks release.yml runs on the tag, run here first so that a release
+  # pull request can't merge and be tagged with a version that then fails
+  # them. A tag can't be moved, so a failure after tagging burns the version.
+  release-guards:
+    name: release-guards
+    if: contains(github.event.pull_request.labels.*.name, 'release') || startsWith(github.head_ref, 'release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read # find breaking pull requests since the last release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Release tags, for the breaking-change check.
+          fetch-depth: 0
+      - name: Run the release checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          # The version comes from a release/vX.Y.Z branch name, or else from
+          # build.gradle.kts. check-release.sh checks the files agree with it.
+          if [[ "$HEAD_REF" =~ ^release/(v.+)$ ]]; then
+            tag="${BASH_REMATCH[1]}"
+          else
+            tag="v$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)"
+          fi
+          echo "Checking release ${tag}"
+          scripts/check-release.sh "$tag" HEAD

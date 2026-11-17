@@ -7,9 +7,11 @@ on:
     - cron: "41 2 * * *"
   workflow_dispatch:
 
+# Each push to main runs to completion, so quick merges don't cancel each
+# other. Only pull request runs (none today) would be cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

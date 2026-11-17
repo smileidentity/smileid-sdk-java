@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+* The token `product` claim for each operation now comes from a table that follows the spec's `x-smile-token-product` (v3.1188.0). No operation's claim changes.
+
 ## [13.0.0] - 2026-11-09
 
 This is a major version because it removes `useEnrolledImage` from `AuthenticationParams`. Version 12.2.0 was never published; its changes are in this release.

@@ -7,12 +7,12 @@ import com.smileidentity.errors.ConnectionException;
 import com.smileidentity.errors.ErrorParser;
 import com.smileidentity.errors.UnexpectedResponseException;
 import com.smileidentity.errors.ValidationException;
+import com.smileidentity.generated.TokenProducts;
 import com.smileidentity.generated.models.TokenResponse;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import okhttp3.HttpUrl;
@@ -38,10 +38,6 @@ public final class Transport {
           + " (java/"
           + System.getProperty("java.version", "unknown")
           + ")";
-
-  // Mirrors the API authorizer: a token bound to a product is accepted only on that product's
-  // endpoint. Paths absent here mint a token with no claims.
-  private static final Map<String, String> PRODUCT_BY_PATH = productByPath();
 
   private final OkHttpClient http;
   private final String baseUrl;
@@ -302,7 +298,7 @@ public final class Transport {
    * subject to the job's request options.
    */
   private String mintToken(ApiRequest req, boolean useEnrolledImage) {
-    String product = PRODUCT_BY_PATH.get(req.getPath());
+    String product = TokenProducts.forPath(req.getPath());
     String userId = product == null ? null : jobUserId(req);
     if (useEnrolledImage && userId == null) {
       throw new ValidationException("user_id is required when use_enrolled_image is true");
@@ -352,19 +348,6 @@ public final class Transport {
       throw new ValidationException("user_id must not be empty or padded with whitespace");
     }
     return userId;
-  }
-
-  private static Map<String, String> productByPath() {
-    Map<String, String> m = new HashMap<>();
-    m.put("/v3/enhanced_kyc", "enhanced_kyc");
-    m.put("/v3/document_verification", "document_verification");
-    m.put("/v3/enhanced_document_verification", "enhanced_document_verification");
-    m.put("/v3/residency_document_verification", "residency_document_verification");
-    m.put("/v3/biometric_kyc", "biometric_kyc");
-    m.put("/v3/registration", "smart_selfie_registration");
-    m.put("/v3/authentication", "smart_selfie_authentication");
-    m.put("/v3/compare", "smart_selfie_compare");
-    return m;
   }
 
   private static String trimTrailingSlash(String url) {

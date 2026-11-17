@@ -1226,7 +1226,9 @@ class GoldenFixturesTest {
                     .limit(10)
                     .build());
 
-    server.takeRequest(); // token
+    List<TestPart> claims = MultipartParser.parse(server.takeRequest());
+    assertEquals("aml", MultipartParser.single(claims, "product").body);
+    assertEquals(1, claims.size());
     RecordedRequest r = server.takeRequest();
     assertEquals("GET", r.getMethod());
     assertEquals(

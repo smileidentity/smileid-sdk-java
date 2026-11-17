@@ -6,9 +6,12 @@ on:
   push:
     branches: [main]
 
+# A new push to a pull request cancels its older run. Pushes to main and merge
+# queue runs each get their own group (by commit), so quick merges don't
+# cancel or replace each other's runs.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

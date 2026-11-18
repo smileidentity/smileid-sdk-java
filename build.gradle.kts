@@ -82,16 +82,25 @@ tasks.check {
 
 // Public API compatibility. CI passes -PapiBaselineJar with the jar of the
 // last vX.Y.Z release, and again with the base branch's jar, and this task
-// fails if the current jar breaks binary or source compatibility with it. Run
-// it locally the same way:
-//   ./gradlew japicmp -PapiBaselineJar=/path/to/usesmileid-java-<version>.jar
+// fails if the current jar breaks binary or source compatibility with it. To
+// run it locally against the last release, use:
+//   scripts/check-api-compat.sh
+// The task fails without -PapiBaselineJar rather than skipping, so a bare
+// `./gradlew japicmp` can't look like a pass.
 // Don't exclude methods here to get a break through: label the pull request
 // `breaking` instead.
 val apiBaselineJar = providers.gradleProperty("apiBaselineJar")
 
 tasks.register<me.champeau.gradle.japicmp.JapicmpTask>("japicmp") {
     description = "Compares the public API with the jar given by -PapiBaselineJar."
-    onlyIf("-PapiBaselineJar is set") { apiBaselineJar.isPresent }
+    doFirst {
+        if (!apiBaselineJar.isPresent) {
+            throw GradleException(
+                "japicmp needs -PapiBaselineJar=<jar of the last release>. " +
+                    "Run scripts/check-api-compat.sh to download it and compare.",
+            )
+        }
+    }
     oldArchives.from(apiBaselineJar.map { files(it) }.orElse(files()))
     newArchives.from(tasks.jar)
     // Resolve OkHttp and Jackson types that appear in signatures.

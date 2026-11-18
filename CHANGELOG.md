@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* `aml()` resource for the AML operations in spec `v3.1188.0`:
+* `aml()` resource for the AML operations in spec `v3.1192.0`:
   * `oneTime(params)` — `POST /v3/aml`. Returns `OneTimeAmlAcceptedResponse`; the result goes to the callback URL.
   * `oneTimeSync(params)` and `oneTimeSync(params, idempotencyKey, options)` — `POST /v3/aml/sync`. Returns the terminal `OneTimeAmlCallback`. With an idempotency key (sent as `SmileID-Idempotency-Key`) the call is retried like other idempotent calls.
   * `monitoring(params)` — `POST /v3/aml/monitoring`. Returns `AcceptedResponse`.
   * `monitoringNews(jobId, reference, params)` — `GET /v3/aml/monitoring/{job_id}/news/{reference}`. Returns `AmlMonitoringNewsResponse`.
-* Tokens for `/v3/aml` and `/v3/aml/sync` are bound to the `one_time_aml` product. Tokens for `/v3/aml/monitoring` and for the news lookup under it are bound to the `aml` product.
+* Tokens for `/v3/aml` and `/v3/aml/sync` are bound to the `one_time_aml` product. Tokens for `/v3/aml/monitoring` and for the news lookup under it are bound to the `aml` product. The product of each path now comes from the spec's `x-smile-token-product` (`OperationProducts`) instead of a hand-kept table.
 
 ## [13.0.0] - 2026-11-09
 

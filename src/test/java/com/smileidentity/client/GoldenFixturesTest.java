@@ -976,7 +976,8 @@ class GoldenFixturesTest {
             .oneTimeSync(
                 goldenOneTime().build(), "kuda-onboarding-8f14e45fceea167a", RequestOptions.none());
 
-    server.takeRequest(); // token
+    List<TestPart> claims = MultipartParser.parse(server.takeRequest());
+    assertEquals("one_time_aml", MultipartParser.single(claims, "product").body);
     RecordedRequest r = server.takeRequest();
     assertEquals("POST", r.getMethod());
     assertEquals("/v3/aml/sync", r.getPath());

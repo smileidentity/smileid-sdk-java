@@ -31,46 +31,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
-      - name: Check the tag matches the version in build.gradle.kts
-        run: |
-          tag_version="${GITHUB_REF_NAME#v}"
-          build_version="$(./gradlew -q properties --property version | awk '/^version: / { print $2 }')"
-          if [ "$tag_version" != "$build_version" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} would publish version ${build_version} from build.gradle.kts. Fix the version or the tag, then try again."
-            exit 1
-          fi
-
-      - name: Check CHANGELOG.md has an entry for this version
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          if ! grep -qE "^## \[${version//./\\.}\]" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## [${version}]' heading. Add a changelog entry for this version before tagging a release."
-            exit 1
-          fi
-
-      - name: Check the version bump matches the breaking pull requests
+      - name: Check the version, changelog and breaking pull requests
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # The previous stable tag that is an ancestor of this one, so a
-          # backport tag on an older line sees only its own commits.
-          previous_tag="$(scripts/release-tags.sh last-stable "${GITHUB_SHA}^")"
-          if [ -z "$previous_tag" ]; then
-            echo "::notice::No earlier vX.Y.Z tag, so there is no version bump to check."
-            exit 0
-          fi
-          # Breaking pull requests whose merge commit is in previous_tag..this tag.
-          breaking="$(scripts/release-tags.sh breaking-prs "$previous_tag" "$GITHUB_SHA")"
-          count=0
-          if [ -n "$breaking" ]; then
-            echo "Pull requests labelled breaking since ${previous_tag}:"
-            echo "$breaking"
-            count="$(printf '%s\n' "$breaking" | wc -l | tr -d ' ')"
-          fi
-          if ! scripts/release-tags.sh check-bump "$previous_tag" "$GITHUB_REF_NAME" "$count"; then
-            echo "::error::${GITHUB_REF_NAME} does not match the breaking pull requests merged since ${previous_tag}. See the message above."
-            exit 1
-          fi
+        # The same checks run on release pull requests (quality-gates.yml), so
+        # they should already pass here.
+        run: scripts/check-release.sh "$GITHUB_REF_NAME"
 
       - name: Check the tag points at a commit on main
         env:
@@ -112,7 +78,30 @@ jobs:
       - name: Example app tests
         run: ./gradlew -p example build
 
+      - name: Check whether this version is already on Maven Central
+        id: central
+        run: |
+          # Central rejects a version it already has, so a re-run of this
+          # workflow (for example, after the GitHub release step failed) must
+          # skip publishing. The pom appears before maven-metadata.xml is
+          # updated, so check both.
+          version="${GITHUB_REF_NAME#v}"
+          base="https://repo1.maven.org/maven2/com/smileidentity/usesmileid-java"
+          pom_status="$(curl -sS -o /dev/null -w '%{http_code}' "${base}/${version}/usesmileid-java-${version}.pom" || true)"
+          metadata="$(curl -sSfL "${base}/maven-metadata.xml" || true)"
+          if [ "$pom_status" = 200 ] || grep -qF "<version>${version}</version>" <<<"$metadata"; then
+            echo "::notice::${version} is already on Maven Central, so it will not be published again."
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          elif [ "$pom_status" = 404 ]; then
+            echo "${version} is not on Maven Central yet."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Could not tell whether ${version} is on Maven Central (HTTP ${pom_status} for its pom). Try again later."
+            exit 1
+          fi
+
       - name: Publish to Maven Central
+        if: steps.central.outputs.published == 'false'
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

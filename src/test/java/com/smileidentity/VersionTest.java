@@ -8,6 +8,6 @@ class VersionTest {
 
   @Test
   void versionMatchesExpected() {
-    assertEquals("13.0.0", Version.VERSION);
+    assertEquals("13.1.0", Version.VERSION);
   }
 }

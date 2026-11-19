@@ -7,14 +7,15 @@ import com.smileidentity.errors.ConnectionException;
 import com.smileidentity.errors.ErrorParser;
 import com.smileidentity.errors.UnexpectedResponseException;
 import com.smileidentity.errors.ValidationException;
-import com.smileidentity.generated.TokenProducts;
 import com.smileidentity.generated.models.TokenResponse;
+import com.smileidentity.generated.operations.OperationProducts;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -38,6 +39,12 @@ public final class Transport {
           + " (java/"
           + System.getProperty("java.version", "unknown")
           + ")";
+
+  // A token bound to a product is accepted only on that product's endpoint (OperationProducts, from
+  // the spec). Paths without a product mint a token with no claims.
+  private static final String AML_NEWS_TEMPLATE = "/v3/aml/monitoring/{job_id}/news/{reference}";
+  private static final Pattern AML_NEWS_PATH =
+      Pattern.compile("/v3/aml/monitoring/[^/]+/news/[^/]+");
 
   private final OkHttpClient http;
   private final String baseUrl;
@@ -298,7 +305,7 @@ public final class Transport {
    * subject to the job's request options.
    */
   private String mintToken(ApiRequest req, boolean useEnrolledImage) {
-    String product = TokenProducts.forPath(req.getPath());
+    String product = OperationProducts.forPath(pathTemplate(req.getPath()));
     String userId = product == null ? null : jobUserId(req);
     if (useEnrolledImage && userId == null) {
       throw new ValidationException("user_id is required when use_enrolled_image is true");
@@ -348,6 +355,11 @@ public final class Transport {
       throw new ValidationException("user_id must not be empty or padded with whitespace");
     }
     return userId;
+  }
+
+  // Path-parameter operations are keyed by their spec path template.
+  private static String pathTemplate(String path) {
+    return AML_NEWS_PATH.matcher(path).matches() ? AML_NEWS_TEMPLATE : path;
   }
 
   private static String trimTrailingSlash(String url) {

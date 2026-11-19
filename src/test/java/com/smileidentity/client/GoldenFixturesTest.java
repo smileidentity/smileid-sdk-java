@@ -1096,7 +1096,29 @@ class GoldenFixturesTest {
     assertThrows(
         ValidationException.class,
         () -> smile.aml().oneTime(goldenOneTime().callbackUrl("http://example.com/cb").build()));
+    assertThrows(
+        ValidationException.class,
+        () -> smile.aml().oneTime(goldenOneTime().searchExistingUser(true).userId(" ").build()));
     assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void oneTimeAmlSyncRejectsAMalformedIdempotencyKeyBeforeSending() {
+    for (String key : new String[] {"", "too-short", "has a space-0123456", repeat('k', 129)}) {
+      ValidationException e =
+          assertThrows(
+              ValidationException.class,
+              () -> smile.aml().oneTimeSync(goldenOneTime().build(), key, RequestOptions.none()));
+      assertEquals(
+          "idempotency_key must be 16 to 128 characters of A-Z, a-z, 0-9, - and _", e.getMessage());
+    }
+    assertEquals(0, server.getRequestCount());
+  }
+
+  private static String repeat(char c, int n) {
+    char[] chars = new char[n];
+    java.util.Arrays.fill(chars, c);
+    return new String(chars);
   }
 
   private static AmlMonitoringParams.Builder goldenMonitoring() {
@@ -1198,6 +1220,19 @@ class GoldenFixturesTest {
     assertThrows(
         ValidationException.class,
         () -> smile.aml().monitoring(goldenMonitoring().userDetails(null).build()));
+    ValidationException e =
+        assertThrows(
+            ValidationException.class,
+            () ->
+                smile
+                    .aml()
+                    .monitoring(
+                        goldenMonitoring()
+                            .fullName(null)
+                            .searchExistingUser(true)
+                            .userId(null)
+                            .build()));
+    assertEquals("user_id is required when search_existing_user is true", e.getMessage());
     assertEquals(0, server.getRequestCount());
   }
 
@@ -1276,6 +1311,21 @@ class GoldenFixturesTest {
     assertThrows(
         ValidationException.class,
         () -> smile.aml().monitoringNews("job", "ref", AmlMonitoringNewsParams.builder().build()));
+    assertThrows(ValidationException.class, () -> smile.aml().monitoringNews("job", "ref", null));
+    AmlMonitoringNewsParams params =
+        AmlMonitoringNewsParams.builder().newsCategory("other").build();
+    for (String blank : new String[] {null, "", " "}) {
+      assertEquals(
+          "job_id is required",
+          assertThrows(
+                  ValidationException.class, () -> smile.aml().monitoringNews(blank, "ref", params))
+              .getMessage());
+      assertEquals(
+          "reference is required",
+          assertThrows(
+                  ValidationException.class, () -> smile.aml().monitoringNews("job", blank, params))
+              .getMessage());
+    }
     assertEquals(0, server.getRequestCount());
   }
 

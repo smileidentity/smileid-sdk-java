@@ -11,25 +11,25 @@ public final class AmlPersonMatch {
   private String name;
 
   @JsonProperty("addresses")
-  private List<Map<String, Object>> addresses;
+  private List<String> addresses;
 
   @JsonProperty("news_summary")
   private List<NewsSummary> newsSummary;
 
   @JsonProperty("aliases")
-  private List<Map<String, Object>> aliases;
+  private List<String> aliases;
 
   @JsonProperty("associations")
   private List<Map<String, Object>> associations;
 
   @JsonProperty("dates_of_birth")
-  private List<Map<String, Object>> datesOfBirth;
+  private List<String> datesOfBirth;
 
   @JsonProperty("enforcement_actions")
   private List<Map<String, Object>> enforcementActions;
 
   @JsonProperty("nationalities")
-  private List<Map<String, Object>> nationalities;
+  private List<String> nationalities;
 
   @JsonProperty("sanctions")
   private List<Map<String, Object>> sanctions;
@@ -41,7 +41,7 @@ public final class AmlPersonMatch {
     return name;
   }
 
-  public List<Map<String, Object>> getAddresses() {
+  public List<String> getAddresses() {
     return addresses;
   }
 
@@ -49,7 +49,7 @@ public final class AmlPersonMatch {
     return newsSummary;
   }
 
-  public List<Map<String, Object>> getAliases() {
+  public List<String> getAliases() {
     return aliases;
   }
 
@@ -57,7 +57,7 @@ public final class AmlPersonMatch {
     return associations;
   }
 
-  public List<Map<String, Object>> getDatesOfBirth() {
+  public List<String> getDatesOfBirth() {
     return datesOfBirth;
   }
 
@@ -65,7 +65,7 @@ public final class AmlPersonMatch {
     return enforcementActions;
   }
 
-  public List<Map<String, Object>> getNationalities() {
+  public List<String> getNationalities() {
     return nationalities;
   }
 

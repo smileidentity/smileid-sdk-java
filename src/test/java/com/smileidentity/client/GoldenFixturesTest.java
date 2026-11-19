@@ -861,9 +861,9 @@ class GoldenFixturesTest {
           + "\"completed_at\":\"2026-07-20T12:00:01.000Z\",\"product\":\"one_time_aml\","
           + "\"partner_params\":{\"order_id\":\"ORD-1\"},\"kyc_receipt\":\"https://receipts.example.com/r\","
           + "\"strict_match\":true,\"no_of_persons_found\":2,\"people\":["
-          + "{\"name\":\"Gbenga Afolabi\",\"addresses\":[],\"aliases\":[{\"name\":\"G. Afolabi\"}],"
-          + "\"associations\":[],\"dates_of_birth\":[{\"year\":\"1990\"}],\"enforcement_actions\":[],"
-          + "\"nationalities\":[{\"country\":\"NG\"}],\"sanctions\":[{\"list\":\"OFAC SDN\"}],"
+          + "{\"name\":\"Gbenga Afolabi\",\"addresses\":[\"12 Marina Road, Lagos\"],\"aliases\":[\"G. Afolabi\"],"
+          + "\"associations\":[],\"dates_of_birth\":[\"1990-05-14\"],\"enforcement_actions\":[],"
+          + "\"nationalities\":[\"Nigeria\"],\"sanctions\":[{\"list\":\"OFAC SDN\"}],"
           + "\"pep\":{\"pep_level\":1,\"political_positions\":[\"Member of Parliament\"],"
           + "\"sources\":[{\"url\":\"https://example.com\"}]}},"
           + "{\"name\":\"Bukola Oni\",\"news_summary\":[{\"news_category\":\"financial_crime\","
@@ -999,12 +999,12 @@ class GoldenFixturesTest {
     assertEquals(2, result.getPeople().size());
     AmlPersonMatch gbenga = result.getPeople().get(0);
     assertEquals("Gbenga Afolabi", gbenga.getName());
-    assertTrue(gbenga.getAddresses().isEmpty());
-    assertEquals("G. Afolabi", gbenga.getAliases().get(0).get("name"));
+    assertEquals(Arrays.asList("12 Marina Road, Lagos"), gbenga.getAddresses());
+    assertEquals(Arrays.asList("G. Afolabi"), gbenga.getAliases());
     assertTrue(gbenga.getAssociations().isEmpty());
-    assertEquals("1990", gbenga.getDatesOfBirth().get(0).get("year"));
+    assertEquals(Arrays.asList("1990-05-14"), gbenga.getDatesOfBirth());
     assertTrue(gbenga.getEnforcementActions().isEmpty());
-    assertEquals("NG", gbenga.getNationalities().get(0).get("country"));
+    assertEquals(Arrays.asList("Nigeria"), gbenga.getNationalities());
     assertEquals("OFAC SDN", gbenga.getSanctions().get(0).get("list"));
     assertEquals(Integer.valueOf(1), gbenga.getPep().getPepLevel());
     assertEquals(Arrays.asList("Member of Parliament"), gbenga.getPep().getPoliticalPositions());

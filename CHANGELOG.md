@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.1.0] - 2026-11-19
+
 ### Added
 
 * `aml()` resource for the AML operations in spec `v3.1192.0`:
@@ -60,7 +62,8 @@ First public release.
 - A typed error hierarchy under `com.smileidentity.errors`, one class per
   HTTP status plus connection and timeout failures.
 
-[Unreleased]: https://github.com/smileidentity/smileid-sdk-java/compare/v13.0.0...HEAD
+[Unreleased]: https://github.com/smileidentity/smileid-sdk-java/compare/v13.1.0...HEAD
+[13.1.0]: https://github.com/smileidentity/smileid-sdk-java/compare/v13.0.0...v13.1.0
 [13.0.0]: https://github.com/smileidentity/smileid-sdk-java/compare/v12.1.0...v13.0.0
 [12.1.0]: https://github.com/smileidentity/smileid-sdk-java/compare/v12.0.0...v12.1.0
 [12.0.0]: https://github.com/smileidentity/smileid-sdk-java/releases/tag/v12.0.0

@@ -15,6 +15,7 @@ import com.smileidentity.errors.UnexpectedResponseException;
 import com.smileidentity.errors.ValidationException;
 import com.smileidentity.generated.models.AcceptedResponse;
 import com.smileidentity.generated.models.AuthenticationParams;
+import com.smileidentity.generated.models.BasicKycParams;
 import com.smileidentity.generated.models.BiometricKycParams;
 import com.smileidentity.generated.models.CompareParams;
 import com.smileidentity.generated.models.ComparisonImageType;
@@ -102,6 +103,17 @@ class TokenLifecycleTest {
     smile.enhancedKyc().verify(enhancedKycParams(userId));
   }
 
+  private static BasicKycParams basicKycParams(String userId) {
+    return BasicKycParams.builder()
+        .country("NG")
+        .idType("NIN")
+        .idNumber("12345678901")
+        .userDetails(user())
+        .consent(consent())
+        .userId(userId)
+        .build();
+  }
+
   private static EnhancedKycParams enhancedKycParams(String userId) {
     return EnhancedKycParams.builder()
         .country("NG")
@@ -156,6 +168,11 @@ class TokenLifecycleTest {
             "enhanced_kyc",
             "/v3/enhanced_kyc",
             c -> c.enhancedKyc().verify(enhancedKycParams("user-1"))),
+        operation("basic_kyc", "/v3/basic_kyc", c -> c.basicKyc().verify(basicKycParams("user-1"))),
+        operation(
+            "basic_kyc",
+            "/v3/basic_kyc/sync",
+            c -> c.basicKyc().verifySync(basicKycParams("user-1"))),
         operation(
             "document_verification",
             "/v3/document_verification",

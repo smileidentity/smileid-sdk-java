@@ -22,6 +22,8 @@ import com.smileidentity.generated.models.AmlMonitoringNewsResponse;
 import com.smileidentity.generated.models.AmlMonitoringParams;
 import com.smileidentity.generated.models.AmlPersonMatch;
 import com.smileidentity.generated.models.AuthenticationParams;
+import com.smileidentity.generated.models.BasicKycParams;
+import com.smileidentity.generated.models.BasicKycResult;
 import com.smileidentity.generated.models.BiometricKycParams;
 import com.smileidentity.generated.models.CompareParams;
 import com.smileidentity.generated.models.ComparisonImageType;
@@ -1355,5 +1357,168 @@ class GoldenFixturesTest {
     }
     int semicolon = contentType.indexOf(';');
     return (semicolon >= 0 ? contentType.substring(0, semicolon) : contentType).trim();
+  }
+
+  // ---------------------------------------------------------------- basic_kyc
+
+  private static final String BASIC_KYC_RESULT =
+      "{\"status\":\"attention\",\"message\":\"Verification completed: partial match.\","
+          + "\"reason\":\"no_comparable_fields\",\"created_at\":\"2026-03-10T12:00:00.000Z\","
+          + "\"completed_at\":\"2026-03-10T12:00:04.000Z\",\"product\":\"basic_kyc\","
+          + "\"partner_params\":{\"order_id\":\"ORD-12345\"},"
+          + "\"match_results\":{\"overall\":\"partial_match\",\"names\":\"transposed\","
+          + "\"first_name\":\"exact_match\",\"last_name\":\"no_match\",\"other_names\":\"not_provided\","
+          + "\"date_of_birth\":\"exact_match\",\"gender\":\"exact_match\","
+          + "\"phone_number\":\"partial_match\",\"secondary_id_number\":\"not_provided\"},"
+          + "\"user_provided_info\":{\"given_names\":\"John\",\"last_name\":\"Doe\","
+          + "\"email\":\"john@example.com\",\"phone_number\":null,\"id_number\":\"12345678901\"},"
+          + "\"consent\":{\"granted\":true},\"antifraud\":{\"fraud_risk_level\":\"low\"},"
+          + "\"device_signals\":{\"ip\":\"203.0.113.1\"},"
+          + "\"kyc_receipt\":\"https://receipts.example.com/r\"}";
+
+  private static BasicKycParams.Builder goldenBasicKyc() {
+    return BasicKycParams.builder()
+        .country("NG")
+        .idType("NIN")
+        .idNumber("12345678901")
+        .userDetails(johnWithEmail())
+        .consent(goldenConsent())
+        .userId("user_01h8x9y2z3a4b5c6d7e8f9g0h1");
+  }
+
+  private List<TestPart> takeBasicKycRequest(String path, String product) throws Exception {
+    RecordedRequest token = server.takeRequest();
+    assertEquals("/v3/token", token.getPath());
+    List<TestPart> claims = MultipartParser.parse(token);
+    assertEquals(product, MultipartParser.single(claims, "product").body);
+    assertEquals("user_01h8x9y2z3a4b5c6d7e8f9g0h1", MultipartParser.single(claims, "user_id").body);
+    RecordedRequest r = server.takeRequest();
+    assertEquals("POST", r.getMethod());
+    assertEquals(path, r.getPath());
+    assertEquals("user_01h8x9y2z3a4b5c6d7e8f9g0h1", r.getHeader("User-ID"));
+    assertNotNull(r.getHeader("SmileID-Token"));
+    assertNull(r.getHeader("SmileID-Partner-ID"));
+    return MultipartParser.parse(r);
+  }
+
+  private static void assertGoldenBasicKycParts(List<TestPart> parts) {
+    assertEquals("NG", MultipartParser.single(parts, "country").body);
+    assertEquals("NIN", MultipartParser.single(parts, "id_type").body);
+    assertEquals("12345678901", MultipartParser.single(parts, "id_number").body);
+    assertEquals(
+        "{\"given_names\":\"John\",\"last_name\":\"Doe\",\"email\":\"john@example.com\"}",
+        MultipartParser.single(parts, "user_details").body);
+    assertEquals(GOLDEN_CONSENT_JSON, MultipartParser.single(parts, "consent").body);
+    assertFalse(MultipartParser.has(parts, "callback_url"));
+    assertFalse(MultipartParser.has(parts, "user_id"));
+  }
+
+  @Test
+  void basicKycVerifyMatchesTheGoldenRequest() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ACCEPTED_LOWER));
+
+    AcceptedResponse accepted = smile.basicKyc().verify(goldenBasicKyc().build());
+
+    assertGoldenBasicKycParts(takeBasicKycRequest("/v3/basic_kyc", "basic_kyc"));
+    assertTrue(accepted.isAccepted());
+    assertEquals(JOB_ID, accepted.getJobId());
+  }
+
+  @Test
+  void basicKycVerifySyncMatchesTheGoldenRequestAndParsesTheResult() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, BASIC_KYC_RESULT));
+
+    BasicKycResult result = smile.basicKyc().verifySync(goldenBasicKyc().build());
+
+    assertGoldenBasicKycParts(takeBasicKycRequest("/v3/basic_kyc/sync", "basic_kyc"));
+    assertEquals("attention", result.getStatus());
+    assertEquals("Verification completed: partial match.", result.getMessage());
+    assertEquals("no_comparable_fields", result.getReason());
+    assertEquals("2026-03-10T12:00:00.000Z", result.getCreatedAt());
+    assertEquals("2026-03-10T12:00:04.000Z", result.getCompletedAt());
+    assertEquals("basic_kyc", result.getProduct());
+    assertEquals("ORD-12345", result.getPartnerParams().get("order_id"));
+    BasicKycResult.MatchResults m = result.getMatchResults();
+    assertEquals("partial_match", m.getOverall());
+    assertEquals("transposed", m.getNames());
+    assertEquals("exact_match", m.getFirstName());
+    assertEquals("no_match", m.getLastName());
+    assertEquals("not_provided", m.getOtherNames());
+    assertEquals("exact_match", m.getDateOfBirth());
+    assertEquals("exact_match", m.getGender());
+    assertEquals("partial_match", m.getPhoneNumber());
+    assertEquals("not_provided", m.getSecondaryIdNumber());
+    BasicKycResult.UserProvidedInfo info = result.getUserProvidedInfo();
+    assertEquals("John", info.getGivenNames());
+    assertEquals("Doe", info.getLastName());
+    assertEquals("john@example.com", info.getEmail());
+    assertNull(info.getPhoneNumber());
+    assertEquals("12345678901", info.getIdNumber());
+    assertEquals(Boolean.TRUE, result.getConsent().get("granted"));
+    assertEquals("low", result.getAntifraud().get("fraud_risk_level"));
+    assertEquals("203.0.113.1", result.getDeviceSignals().get("ip"));
+    assertEquals("https://receipts.example.com/r", result.getKycReceipt());
+  }
+
+  @Test
+  void basicKycOptionalFieldsAreSerializedWhenPresent() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ACCEPTED_LOWER));
+
+    Map<String, String> partnerParams = new LinkedHashMap<>();
+    partnerParams.put("order_id", "ORD-12345");
+    smile
+        .basicKyc()
+        .verify(
+            goldenBasicKyc()
+                .idType("BANK_ACCOUNT")
+                .bankCode("044")
+                .operator("MTN")
+                .callbackUrl("https://app.example.com/cb")
+                .partnerParams(partnerParams)
+                .metadata(Arrays.asList(new MetadataEntry("source", "sdk-test")))
+                .build());
+
+    List<TestPart> parts = takeBasicKycRequest("/v3/basic_kyc", "basic_kyc");
+    assertEquals("BANK_ACCOUNT", MultipartParser.single(parts, "id_type").body);
+    assertEquals("044", MultipartParser.single(parts, "bank_code").body);
+    assertEquals("MTN", MultipartParser.single(parts, "operator").body);
+    assertEquals("https://app.example.com/cb", MultipartParser.single(parts, "callback_url").body);
+    assertEquals(
+        "{\"order_id\":\"ORD-12345\"}", MultipartParser.single(parts, "partner_params").body);
+    assertEquals(
+        "[{\"name\":\"source\",\"value\":\"sdk-test\"}]",
+        MultipartParser.single(parts, "metadata").body);
+  }
+
+  @Test
+  void basicKycRequiresEmailOrPhoneBeforeSending() {
+    BasicKycParams noContact =
+        goldenBasicKyc()
+            .userDetails(UserDetails.builder().givenNames("John").lastName("Doe").build())
+            .build();
+    assertThrows(ValidationException.class, () -> smile.basicKyc().verify(noContact));
+    assertThrows(ValidationException.class, () -> smile.basicKyc().verifySync(noContact));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void basicKycSyncIsNeverRetriedAndSurfacesA424() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+            424,
+            "{\"status\":\"Failed Dependency\",\"message\":\"Unable to verify ID — ID authority"
+                + " unavailable.\"}"));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
+
+    assertEquals(424, e.getStatusCode());
+    assertEquals("Unable to verify ID — ID authority unavailable.", e.getMessage());
+    assertEquals(2, server.getRequestCount());
   }
 }

@@ -16,6 +16,8 @@ class OperationProductsTest {
     "/v3/aml/monitoring/{job_id}/news/{reference},aml",
     "/v3/authentication,smart_selfie_authentication",
     "/v3/registration,smart_selfie_registration",
+    "/v3/basic_kyc,basic_kyc",
+    "/v3/basic_kyc/sync,basic_kyc",
     "/v3/biometric_kyc,biometric_kyc",
     "/v3/document_verification,document_verification",
     "/v3/enhanced_document_verification,enhanced_document_verification",

@@ -122,6 +122,25 @@ accepted.getJobId();     // "job_..."
 accepted.isAccepted();   // true — normalizes "Accepted" and "accepted"
 ```
 
+### Basic KYC
+
+Basic KYC reports whether the details you submit match the ID authority's record. It never returns the record. `verify` queues the check and delivers the result to your callback URL. `verifySync` returns the result directly:
+
+```java
+import com.smileidentity.generated.models.BasicKycParams;
+import com.smileidentity.generated.models.BasicKycResult;
+
+BasicKycResult result = smile.basicKyc().verifySync(BasicKycParams.builder()
+    .country("NG").idType("NIN").idNumber("12345678901")
+    .userDetails(user)
+    .consent(consent)
+    .build());
+result.getStatus();                           // "clear", "attention", "block" or "error"
+result.getMatchResults().getOverall();        // e.g. "exact_match"
+```
+
+If a sync check cannot be completed, `verifySync` throws `ApiException` (408, 424 or 500). The job is still recorded, so read its outcome with the status lookup rather than submitting again, which would bill a second lookup.
+
 ### Document verification
 
 ```java

@@ -7,14 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [13.1.0] - 2026-11-19
-
 ### Added
 
 * `basicKyc()` resource for the Basic KYC operations in spec `v3.1215.0`:
   * `verify(params)` — `POST /v3/basic_kyc`. Returns `AcceptedResponse`; the result goes to the callback URL.
   * `verifySync(params)` — `POST /v3/basic_kyc/sync`. Returns the terminal `BasicKycResult`. It is never retried, because a retry would bill a second lookup. It never sends the client's default callback URL, because the sync endpoint ignores `callback_url`.
 * Tokens for both Basic KYC paths are bound to the `basic_kyc` product.
+
+## [13.1.0] - 2026-11-19
+
+### Added
+
 * `aml()` resource for the AML operations in spec `v3.1192.0`:
   * `oneTime(params)` — `POST /v3/aml`. Returns `OneTimeAmlAcceptedResponse`; the result goes to the callback URL.
   * `oneTimeSync(params)` and `oneTimeSync(params, idempotencyKey, options)` — `POST /v3/aml/sync`. Returns the terminal `OneTimeAmlCallback`. With an idempotency key (sent as `SmileID-Idempotency-Key`) the call is retried like other idempotent calls.

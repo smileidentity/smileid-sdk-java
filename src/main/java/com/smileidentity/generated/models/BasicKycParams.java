@@ -16,7 +16,6 @@ public final class BasicKycParams {
   private final String operator;
   private final Map<String, String> partnerParams;
   private final List<MetadataEntry> metadata;
-  private final String userId;
 
   private BasicKycParams(Builder b) {
     this.country = b.country;
@@ -29,7 +28,6 @@ public final class BasicKycParams {
     this.operator = b.operator;
     this.partnerParams = b.partnerParams;
     this.metadata = b.metadata;
-    this.userId = b.userId;
   }
 
   public static Builder builder() {
@@ -76,10 +74,6 @@ public final class BasicKycParams {
     return metadata;
   }
 
-  public String getUserId() {
-    return userId;
-  }
-
   public static final class Builder {
     private String country;
     private String idType;
@@ -91,7 +85,6 @@ public final class BasicKycParams {
     private String operator;
     private Map<String, String> partnerParams;
     private List<MetadataEntry> metadata;
-    private String userId;
 
     public Builder country(String country) {
       this.country = country;
@@ -118,6 +111,10 @@ public final class BasicKycParams {
       return this;
     }
 
+    /**
+     * Where {@code verify} delivers the result. {@code verifySync} sends it only when set here,
+     * never the client's default, because the sync endpoint ignores it.
+     */
     public Builder callbackUrl(String callbackUrl) {
       this.callbackUrl = callbackUrl;
       return this;
@@ -140,12 +137,6 @@ public final class BasicKycParams {
 
     public Builder metadata(List<MetadataEntry> metadata) {
       this.metadata = metadata;
-      return this;
-    }
-
-    /** Sent as the User-ID header (spec). */
-    public Builder userId(String userId) {
-      this.userId = userId;
       return this;
     }
 

@@ -103,14 +103,13 @@ class TokenLifecycleTest {
     smile.enhancedKyc().verify(enhancedKycParams(userId));
   }
 
-  private static BasicKycParams basicKycParams(String userId) {
+  private static BasicKycParams basicKycParams() {
     return BasicKycParams.builder()
         .country("NG")
         .idType("NIN")
         .idNumber("12345678901")
         .userDetails(user())
         .consent(consent())
-        .userId(userId)
         .build();
   }
 
@@ -162,17 +161,20 @@ class TokenLifecycleTest {
     return Arguments.of(name, path, call);
   }
 
+  // Basic KYC has no user_id, so its token binds only the product.
+  private static Stream<Arguments> basicKycOperations() {
+    return Stream.of(
+        operation("basic_kyc", "/v3/basic_kyc", c -> c.basicKyc().verify(basicKycParams())),
+        operation(
+            "basic_kyc", "/v3/basic_kyc/sync", c -> c.basicKyc().verifySync(basicKycParams())));
+  }
+
   private static Stream<Arguments> jobOperations() {
     return Stream.of(
         operation(
             "enhanced_kyc",
             "/v3/enhanced_kyc",
             c -> c.enhancedKyc().verify(enhancedKycParams("user-1"))),
-        operation("basic_kyc", "/v3/basic_kyc", c -> c.basicKyc().verify(basicKycParams("user-1"))),
-        operation(
-            "basic_kyc",
-            "/v3/basic_kyc/sync",
-            c -> c.basicKyc().verifySync(basicKycParams("user-1"))),
         operation(
             "document_verification",
             "/v3/document_verification",
@@ -345,6 +347,21 @@ class TokenLifecycleTest {
     assertEquals("/v3/token", tokenReq.getPath());
     assertEquals(0, tokenReq.getBodySize());
     assertEquals(path, server.takeRequest().getRequestUrl().encodedPath());
+  }
+
+  @ParameterizedTest(name = "{1}")
+  @MethodSource("basicKycOperations")
+  void basicKycTokenBindsOnlyItsProduct(String product, String path, Consumer<SmileID> call)
+      throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ACCEPTED));
+
+    call.accept(smile);
+
+    assertEquals(claims("product", product), claims(server.takeRequest()));
+    RecordedRequest job = server.takeRequest();
+    assertEquals(path, job.getPath());
+    assertNull(job.getHeader("User-ID"));
   }
 
   @Test

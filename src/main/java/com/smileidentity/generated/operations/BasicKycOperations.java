@@ -7,6 +7,7 @@ import com.smileidentity.client.Transport;
 import com.smileidentity.generated.models.AcceptedResponse;
 import com.smileidentity.generated.models.BasicKycParams;
 import com.smileidentity.generated.models.BasicKycResult;
+import com.smileidentity.helpers.Validators;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,26 +19,34 @@ public final class BasicKycOperations {
   public static AcceptedResponse basicKyc(
       Transport transport, BasicKycParams params, RequestOptions options) {
     return transport.execute(
-        request("/v3/basic_kyc", transport, params, options), AcceptedResponse.class);
+        request(
+            "/v3/basic_kyc",
+            params,
+            options,
+            OperationSupport.effectiveCallbackUrl(transport, params.getCallbackUrl(), options)),
+        AcceptedResponse.class);
   }
 
+  /**
+   * The sync endpoint ignores callback_url, so only a callback URL set on the params is sent; the
+   * client's default callback URL never is.
+   */
   public static BasicKycResult basicKycSync(
       Transport transport, BasicKycParams params, RequestOptions options) {
+    Validators.requireHttpsCallbackUrl(params.getCallbackUrl(), "callbackUrl");
     return transport.execute(
-        request("/v3/basic_kyc/sync", transport, params, options), BasicKycResult.class);
+        request("/v3/basic_kyc/sync", params, options, params.getCallbackUrl()),
+        BasicKycResult.class);
   }
 
   private static ApiRequest request(
-      String path, Transport transport, BasicKycParams params, RequestOptions options) {
+      String path, BasicKycParams params, RequestOptions options, String callbackUrl) {
     List<Part> parts = new ArrayList<>();
     OperationSupport.addText(parts, "country", params.getCountry());
     OperationSupport.addText(parts, "id_type", params.getIdType());
     OperationSupport.addText(parts, "id_number", params.getIdNumber());
     OperationSupport.addUserDetailsAndConsent(parts, params.getUserDetails(), params.getConsent());
-    OperationSupport.addText(
-        parts,
-        "callback_url",
-        OperationSupport.effectiveCallbackUrl(transport, params.getCallbackUrl(), options));
+    OperationSupport.addText(parts, "callback_url", callbackUrl);
     OperationSupport.addText(parts, "bank_code", params.getBankCode());
     OperationSupport.addText(parts, "operator", params.getOperator());
     OperationSupport.addPartnerParamsAndMetadata(
@@ -46,7 +55,6 @@ public final class BasicKycOperations {
         .method("POST")
         .path(path)
         .authenticated(true)
-        .userIdHeader(params.getUserId())
         .multipart(parts)
         .options(options)
         .build();

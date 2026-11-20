@@ -139,7 +139,9 @@ result.getStatus();                           // "clear", "attention", "block" o
 result.getMatchResults().getOverall();        // e.g. "exact_match"
 ```
 
-If a sync check cannot be completed, `verifySync` throws `ApiException` (408, 424 or 500). The job is still recorded, so read its outcome with the status lookup rather than submitting again, which would bill a second lookup.
+If a sync check cannot be completed, `verifySync` throws `ApiException` (408, 424 or 500). The job may still have run, and resubmitting runs and bills a second lookup, so don't resubmit automatically.
+
+`verifySync` never sends the client's `defaultCallbackUrl`, because the sync endpoint ignores `callback_url`. It sends a `callbackUrl` only if you set one on the params.
 
 ### Document verification
 

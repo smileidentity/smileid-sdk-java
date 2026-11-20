@@ -1382,8 +1382,7 @@ class GoldenFixturesTest {
         .idType("NIN")
         .idNumber("12345678901")
         .userDetails(johnWithEmail())
-        .consent(goldenConsent())
-        .userId("user_01h8x9y2z3a4b5c6d7e8f9g0h1");
+        .consent(goldenConsent());
   }
 
   private List<TestPart> takeBasicKycRequest(String path, String product) throws Exception {
@@ -1391,11 +1390,11 @@ class GoldenFixturesTest {
     assertEquals("/v3/token", token.getPath());
     List<TestPart> claims = MultipartParser.parse(token);
     assertEquals(product, MultipartParser.single(claims, "product").body);
-    assertEquals("user_01h8x9y2z3a4b5c6d7e8f9g0h1", MultipartParser.single(claims, "user_id").body);
+    assertFalse(MultipartParser.has(claims, "user_id"), "Basic KYC has no user_id");
     RecordedRequest r = server.takeRequest();
     assertEquals("POST", r.getMethod());
     assertEquals(path, r.getPath());
-    assertEquals("user_01h8x9y2z3a4b5c6d7e8f9g0h1", r.getHeader("User-ID"));
+    assertNull(r.getHeader("User-ID"), "the spec defines no User-ID header for Basic KYC");
     assertNotNull(r.getHeader("SmileID-Token"));
     assertNull(r.getHeader("SmileID-Partner-ID"));
     return MultipartParser.parse(r);
@@ -1405,11 +1404,24 @@ class GoldenFixturesTest {
     assertEquals("NG", MultipartParser.single(parts, "country").body);
     assertEquals("NIN", MultipartParser.single(parts, "id_type").body);
     assertEquals("12345678901", MultipartParser.single(parts, "id_number").body);
+    TestPart userDetails = MultipartParser.single(parts, "user_details");
+    assertEquals("application/json", baseType(userDetails.contentType));
     assertEquals(
         "{\"given_names\":\"John\",\"last_name\":\"Doe\",\"email\":\"john@example.com\"}",
-        MultipartParser.single(parts, "user_details").body);
-    assertEquals(GOLDEN_CONSENT_JSON, MultipartParser.single(parts, "consent").body);
+        userDetails.body);
+    TestPart consent = MultipartParser.single(parts, "consent");
+    assertEquals("application/json", baseType(consent.contentType));
+    assertEquals(GOLDEN_CONSENT_JSON, consent.body);
+    // Scalar parts have no content type on the wire.
+    assertNull(MultipartParser.single(parts, "country").contentType);
+    assertNull(MultipartParser.single(parts, "id_type").contentType);
+    assertNull(MultipartParser.single(parts, "id_number").contentType);
+    // No parts invented for absent optionals.
     assertFalse(MultipartParser.has(parts, "callback_url"));
+    assertFalse(MultipartParser.has(parts, "bank_code"));
+    assertFalse(MultipartParser.has(parts, "operator"));
+    assertFalse(MultipartParser.has(parts, "partner_params"));
+    assertFalse(MultipartParser.has(parts, "metadata"));
     assertFalse(MultipartParser.has(parts, "user_id"));
   }
 
@@ -1505,20 +1517,94 @@ class GoldenFixturesTest {
   }
 
   @Test
-  void basicKycSyncIsNeverRetriedAndSurfacesA424() throws Exception {
+  void basicKycSyncIsNeverRetriedAndSurfacesA500() throws Exception {
+    // RetryPolicy retries a 500 on idempotent calls, so a second request here would be a retry.
+    smile.transport().setSleeper(millis -> {});
     enqueueToken();
     server.enqueue(
         TestSupport.json(
-            424,
-            "{\"status\":\"Failed Dependency\",\"message\":\"Unable to verify ID — ID authority"
-                + " unavailable.\"}"));
+            500, "{\"status\":\"Internal Server Error\",\"message\":\"Lookup failed.\"}"));
+    server.enqueue(TestSupport.json(200, BASIC_KYC_RESULT));
 
     ApiException e =
         assertThrows(
             ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
 
-    assertEquals(424, e.getStatusCode());
-    assertEquals("Unable to verify ID — ID authority unavailable.", e.getMessage());
+    assertEquals(500, e.getStatusCode());
+    assertEquals("Lookup failed.", e.getMessage());
+    assertEquals("/v3/token", server.takeRequest().getPath());
+    assertEquals("/v3/basic_kyc/sync", server.takeRequest().getPath());
+    // Exactly one sync request: the token fetch plus the single sync call.
     assertEquals(2, server.getRequestCount());
+  }
+
+  @Test
+  void basicKycSyncNeverSendsTheDefaultCallbackUrl() throws Exception {
+    SmileID withDefault =
+        TestSupport.clientBuilder(server)
+            .defaultCallbackUrl("https://app.example.com/default")
+            .build();
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, BASIC_KYC_RESULT));
+
+    withDefault.basicKyc().verifySync(goldenBasicKyc().build());
+
+    server.takeRequest();
+    List<TestPart> parts = MultipartParser.parse(server.takeRequest());
+    assertFalse(MultipartParser.has(parts, "callback_url"));
+  }
+
+  @Test
+  void basicKycSyncSendsACallbackUrlSetOnTheParams() throws Exception {
+    SmileID withDefault =
+        TestSupport.clientBuilder(server)
+            .defaultCallbackUrl("https://app.example.com/default")
+            .build();
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, BASIC_KYC_RESULT));
+
+    withDefault
+        .basicKyc()
+        .verifySync(goldenBasicKyc().callbackUrl("https://app.example.com/from-params").build());
+
+    server.takeRequest();
+    List<TestPart> parts = MultipartParser.parse(server.takeRequest());
+    assertEquals(
+        "https://app.example.com/from-params", MultipartParser.single(parts, "callback_url").body);
+  }
+
+  @Test
+  void basicKycSyncRejectsANonHttpsCallbackUrlBeforeSending() {
+    assertThrows(
+        ValidationException.class,
+        () ->
+            smile
+                .basicKyc()
+                .verifySync(goldenBasicKyc().callbackUrl("http://app.example.com/cb").build()));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void basicKycErrorResultParsesWithNullFields() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+            200,
+            "{\"status\":\"error\",\"message\":\"Unable to verify ID.\","
+                + "\"created_at\":\"2026-03-10T12:00:00.000Z\",\"product\":\"basic_kyc\","
+                + "\"match_results\":null,\"reason\":null,\"partner_params\":null,"
+                + "\"antifraud\":null,\"kyc_receipt\":null}"));
+
+    BasicKycResult result = smile.basicKyc().verifySync(goldenBasicKyc().build());
+
+    assertEquals("error", result.getStatus());
+    assertEquals("Unable to verify ID.", result.getMessage());
+    assertNull(result.getMatchResults());
+    assertNull(result.getReason());
+    assertNull(result.getPartnerParams());
+    assertNull(result.getAntifraud());
+    assertNull(result.getDeviceSignals());
+    assertNull(result.getKycReceipt());
+    assertNull(result.getCompletedAt());
   }
 }

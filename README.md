@@ -19,7 +19,7 @@ The SDK is published to Maven Central as `com.smileidentity:usesmileid-java`.
 Gradle:
 
 ```kotlin
-implementation("com.smileidentity:usesmileid-java:13.0.0")
+implementation("com.smileidentity:usesmileid-java:13.1.0")
 ```
 
 Maven:
@@ -28,7 +28,7 @@ Maven:
 <dependency>
   <groupId>com.smileidentity</groupId>
   <artifactId>usesmileid-java</artifactId>
-  <version>13.0.0</version>
+  <version>13.1.0</version>
 </dependency>
 ```
 

@@ -31,6 +31,7 @@ import com.smileidentity.generated.models.Consent;
 import com.smileidentity.generated.models.DocumentVerificationParams;
 import com.smileidentity.generated.models.EnhancedDocumentVerificationParams;
 import com.smileidentity.generated.models.EnhancedKycParams;
+import com.smileidentity.generated.models.EnhancedKycResult;
 import com.smileidentity.generated.models.EnrollParams;
 import com.smileidentity.generated.models.FraudReason;
 import com.smileidentity.generated.models.JobStatus;
@@ -60,6 +61,8 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Spec §6 golden fixtures: for each of the 14 operations, the serialized request matches the spec
@@ -1792,5 +1795,287 @@ class GoldenFixturesTest {
     assertNull(result.getDeviceSignals());
     assertNull(result.getKycReceipt());
     assertNull(result.getCompletedAt());
+  }
+
+  // ---------------------------------------------------------------- enhanced_kyc/sync
+
+  private static final String USER_ID = "user_01h8x9y2z3a4b5c6d7e8f9g0h1";
+
+  // The Amberford persona (submitEnhancedKycSync/amberford in smileid-sdk-fixtures), with the spec
+  // example's job, user and receipt fields and two fields the spec leaves untyped.
+  private static final String ENHANCED_KYC_RESULT =
+      "{\"job_id\":\"job_from_body\",\"user_id\":\"user_from_body\","
+          + "\"status\":\"attention\",\"reason\":\"medium_risk\","
+          + "\"message\":\"Verification successful\","
+          + "\"kyc_receipt\":\"https://portal.usesmileid.com/api/v3/001/job_result_summary/"
+          + JOB_ID
+          + "/generate_v3_pdf/live?token=REDACTED\","
+          + "\"product\":\"enhanced_kyc\",\"partner_params\":{\"order_id\":\"ORD-12345\"}}";
+
+  private static EnhancedKycParams.Builder goldenEnhancedKyc() {
+    return EnhancedKycParams.builder()
+        .country("NG")
+        .idType("NIN")
+        .idNumber("12345678901")
+        .userDetails(johnWithEmail())
+        .consent(goldenConsent());
+  }
+
+  @Test
+  void enhancedKycVerifySyncMatchesTheGoldenRequestAndParsesTheResult() throws Exception {
+    enqueueToken();
+    // Header names arrive lower-cased through some proxies; the lookup ignores case.
+    server.enqueue(
+        TestSupport.json(200, ENHANCED_KYC_RESULT)
+            .setHeader("smileid-job-id", JOB_ID)
+            .setHeader("user-id", USER_ID)
+            .setHeader("response-signature", "c2lnbmF0dXJl")
+            .setHeader("response-timestamp", "2026-03-10T12:00:04.000Z"));
+
+    EnhancedKycResult result =
+        smile.enhancedKyc().verifySync(goldenEnhancedKyc().userId(USER_ID).build());
+
+    RecordedRequest token = server.takeRequest();
+    assertEquals("/v3/token", token.getPath());
+    List<TestPart> claims = MultipartParser.parse(token);
+    assertEquals("enhanced_kyc", MultipartParser.single(claims, "product").body);
+    assertEquals(USER_ID, MultipartParser.single(claims, "user_id").body);
+    RecordedRequest r = server.takeRequest();
+    assertEquals("POST", r.getMethod());
+    assertEquals("/v3/enhanced_kyc/sync", r.getPath());
+    assertEquals(USER_ID, r.getHeader("User-ID"));
+    assertNotNull(r.getHeader("SmileID-Token"));
+    assertNull(r.getHeader("SmileID-Partner-ID"), "no Partner-ID header on enhanced_kyc/sync");
+    assertTrue(r.getHeader("Content-Type").startsWith("multipart/form-data"));
+    List<TestPart> parts = MultipartParser.parse(r);
+    // Same body as Basic KYC and async Enhanced KYC: the request model is shared.
+    assertGoldenBasicKycParts(parts);
+    assertEquals(5, parts.size(), "only the five required parts are sent");
+
+    assertEquals(JOB_ID, result.getJobId(), "the SmileID-Job-ID header wins over the body");
+    assertEquals(USER_ID, result.getUserId(), "the User-ID header wins over the body");
+    assertEquals("c2lnbmF0dXJl", result.getResponseSignature());
+    assertEquals("2026-03-10T12:00:04.000Z", result.getResponseTimestamp());
+    assertEquals("attention", result.getStatus());
+    assertEquals("medium_risk", result.getReason());
+    assertEquals("Verification successful", result.getMessage());
+    assertEquals(
+        "https://portal.usesmileid.com/api/v3/001/job_result_summary/"
+            + JOB_ID
+            + "/generate_v3_pdf/live?token=REDACTED",
+        result.getKycReceipt());
+    Map<String, Object> more = result.getAdditionalProperties();
+    assertEquals(2, more.size(), "typed fields are not repeated: " + more);
+    assertEquals("enhanced_kyc", more.get("product"));
+    assertEquals(Collections.singletonMap("order_id", "ORD-12345"), more.get("partner_params"));
+    assertThrows(UnsupportedOperationException.class, () -> more.put("x", "y"));
+  }
+
+  @Test
+  void enhancedKycSyncFallsBackToTheBodyAndHasNoSignatureWithoutTheHeaders() throws Exception {
+    enqueueToken();
+    // A blank User-ID header counts as absent. Signature fields in the body are not headers.
+    server.enqueue(
+        TestSupport.json(
+                200,
+                ENHANCED_KYC_RESULT.replace(
+                    "}}",
+                    "},\"response_signature\":\"from_body\","
+                        + "\"response_timestamp\":\"from_body\"}"))
+            .setHeader("User-ID", " "));
+
+    EnhancedKycResult result = smile.enhancedKyc().verifySync(goldenEnhancedKyc().build());
+
+    assertEquals("job_from_body", result.getJobId());
+    assertEquals("user_from_body", result.getUserId());
+    assertNull(result.getResponseSignature());
+    assertNull(result.getResponseTimestamp());
+    assertEquals(2, result.getAdditionalProperties().size());
+  }
+
+  @Test
+  void enhancedKycSyncIdsAreNullWhenNeitherHeaderNorBodyHasThem() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, "{\"status\":\"clear\"}"));
+
+    EnhancedKycResult result = smile.enhancedKyc().verifySync(goldenEnhancedKyc().build());
+
+    assertNull(result.getJobId());
+    assertNull(result.getUserId());
+    assertNull(result.getResponseSignature());
+    assertNull(result.getResponseTimestamp());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {408, 424, 500})
+  void enhancedKycSyncIsNeverRetriedOn408Or424Or500AndCarriesTheJobId(int code) throws Exception {
+    // RetryPolicy retries these statuses on idempotent calls, so a second sync request here would
+    // be a retry. A success is queued behind the failure so that a retry would show up.
+    smile.transport().setSleeper(millis -> {});
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(code, "{\"status\":\"error\",\"message\":\"Not completed.\"}")
+            .setHeader("SmileID-Job-ID", JOB_ID));
+    server.enqueue(TestSupport.json(200, ENHANCED_KYC_RESULT));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.enhancedKyc().verifySync(goldenEnhancedKyc().build()));
+
+    assertEquals(code, e.getStatusCode());
+    assertEquals("Not completed.", e.getMessage());
+    assertEquals(JOB_ID, e.getJobId());
+    assertEquals("/v3/token", server.takeRequest().getPath());
+    assertEquals("/v3/enhanced_kyc/sync", server.takeRequest().getPath());
+    assertEquals(2, server.getRequestCount(), "the sync call was retried");
+  }
+
+  @Test
+  void enhancedKycSync500WithoutAJobIdHeaderHasNoJobId() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(500, "{\"message\":\"Internal server error\"}"));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.enhancedKyc().verifySync(goldenEnhancedKyc().build()));
+
+    assertEquals(500, e.getStatusCode());
+    assertNull(e.getJobId());
+  }
+
+  @Test
+  void enhancedKycSyncTimeoutIsResolvedByReadingTheStatusWithTheErrorsJobId() throws Exception {
+    // The README's advice for a 408: don't resubmit; read the outcome with the job id instead.
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+                408, "{\"status\":\"Request Timeout\",\"message\":\"The ID authority timed out.\"}")
+            .setHeader("SmileID-Job-ID", JOB_ID));
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+            200,
+            "{\"status\":\"attention\",\"job_id\":\""
+                + JOB_ID
+                + "\",\"user_id\":\""
+                + USER_ID
+                + "\",\"message\":\"Job completed\","
+                + "\"created_at\":\"2026-03-10T12:00:09.000Z\"}"));
+
+    JobStatus status;
+    try {
+      smile.enhancedKyc().verifySync(goldenEnhancedKyc().build());
+      throw new AssertionError("expected the 408 to throw");
+    } catch (ApiException e) {
+      assertEquals(408, e.getStatusCode());
+      status = smile.verifications().retrieve(e.getJobId());
+    }
+
+    assertEquals("/v3/token", server.takeRequest().getPath());
+    assertEquals("/v3/enhanced_kyc/sync", server.takeRequest().getPath());
+    assertEquals("/v3/token", server.takeRequest().getPath());
+    RecordedRequest r = server.takeRequest();
+    assertEquals("GET", r.getMethod());
+    assertEquals("/v3/status/" + JOB_ID, r.getPath());
+    assertEquals(4, server.getRequestCount(), "the sync call was not resubmitted");
+    assertTrue(status.isComplete());
+    assertEquals("attention", status.getStatus());
+    assertEquals(JOB_ID, status.getJobId());
+    assertEquals(USER_ID, status.getUserId());
+    assertEquals("Job completed", status.getMessage());
+  }
+
+  @Test
+  void enhancedKycSyncNeverSendsTheDefaultCallbackUrl() throws Exception {
+    SmileID withDefault =
+        TestSupport.clientBuilder(server)
+            .defaultCallbackUrl("https://app.example.com/default")
+            .build();
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, ENHANCED_KYC_RESULT));
+
+    withDefault.enhancedKyc().verifySync(goldenEnhancedKyc().build());
+
+    server.takeRequest();
+    List<TestPart> parts = MultipartParser.parse(server.takeRequest());
+    assertFalse(MultipartParser.has(parts, "callback_url"));
+  }
+
+  @Test
+  void enhancedKycSyncSendsOptionalFieldsAndACallbackUrlSetOnTheParams() throws Exception {
+    SmileID withDefault =
+        TestSupport.clientBuilder(server)
+            .defaultCallbackUrl("https://app.example.com/default")
+            .build();
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, ENHANCED_KYC_RESULT));
+
+    Map<String, String> partnerParams = new LinkedHashMap<>();
+    partnerParams.put("order_id", "ORD-12345");
+    withDefault
+        .enhancedKyc()
+        .verifySync(
+            goldenEnhancedKyc()
+                .idType("BANK_ACCOUNT")
+                .bankCode("044")
+                .operator("MTN")
+                .callbackUrl("https://app.example.com/from-params")
+                .partnerParams(partnerParams)
+                .metadata(Arrays.asList(new MetadataEntry("source", "sdk-test")))
+                .build());
+
+    server.takeRequest();
+    List<TestPart> parts = MultipartParser.parse(server.takeRequest());
+    assertEquals("BANK_ACCOUNT", MultipartParser.single(parts, "id_type").body);
+    assertEquals("044", MultipartParser.single(parts, "bank_code").body);
+    assertEquals("MTN", MultipartParser.single(parts, "operator").body);
+    assertEquals(
+        "https://app.example.com/from-params", MultipartParser.single(parts, "callback_url").body);
+    assertEquals(
+        "{\"order_id\":\"ORD-12345\"}", MultipartParser.single(parts, "partner_params").body);
+    assertEquals(
+        "[{\"name\":\"source\",\"value\":\"sdk-test\"}]",
+        MultipartParser.single(parts, "metadata").body);
+  }
+
+  @Test
+  void enhancedKycSyncRejectsInvalidParamsBeforeSending() {
+    assertThrows(
+        ValidationException.class,
+        () ->
+            smile
+                .enhancedKyc()
+                .verifySync(goldenEnhancedKyc().callbackUrl("http://app.example.com/cb").build()));
+    assertThrows(
+        ValidationException.class,
+        () ->
+            smile
+                .enhancedKyc()
+                .verifySync(
+                    goldenEnhancedKyc()
+                        .userDetails(
+                            UserDetails.builder().givenNames("John").lastName("Doe").build())
+                        .build()));
+    assertEquals(0, server.getRequestCount());
+  }
+
+  @Test
+  void enhancedKycErrorResultParsesWithNullFields() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+            200,
+            "{\"status\":\"error\",\"reason\":\"service_unavailable\","
+                + "\"message\":\"Error: external service unavailable\",\"kyc_receipt\":null}"));
+
+    EnhancedKycResult result = smile.enhancedKyc().verifySync(goldenEnhancedKyc().build());
+
+    assertNull(result.getJobId());
+    assertNull(result.getUserId());
+    assertEquals("error", result.getStatus());
+    assertEquals("service_unavailable", result.getReason());
+    assertEquals("Error: external service unavailable", result.getMessage());
+    assertNull(result.getKycReceipt());
+    assertTrue(result.getAdditionalProperties().isEmpty());
   }
 }

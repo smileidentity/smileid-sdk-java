@@ -122,6 +122,48 @@ accepted.getJobId();     // "job_..."
 accepted.isAccepted();   // true — normalizes "Accepted" and "accepted"
 ```
 
+`verify` queues the check and delivers the result to your callback URL. `verifySync` takes the same params and returns the result directly. The result is the same payload the callback would have carried:
+
+```java
+import com.smileidentity.generated.models.EnhancedKycResult;
+
+EnhancedKycResult result = smile.enhancedKyc().verifySync(EnhancedKycParams.builder()
+    .country("NG").idType("NIN").idNumber("12345678901")
+    .userDetails(user)
+    .consent(consent)
+    .build());
+result.getJobId();                 // "job_...", from the SmileID-Job-ID header
+result.getUserId();                // "user_...", from the User-ID header
+result.getStatus();                // "clear", "attention", "block" or "error"
+result.getReason();                // e.g. "medium_risk"; null when clear
+result.getAdditionalProperties();  // every other field of the payload
+result.getResponseSignature();     // the Response-Signature header
+result.getResponseTimestamp();     // the Response-Timestamp header
+```
+
+The job ID and user ID come from the response headers, or from the body when a header is missing. The response carries the same `Response-Signature` and `Response-Timestamp` headers as a webhook. The result returns them as strings (null when absent) so you can check them with your own webhook verification code. The SDK does not verify them.
+
+If a sync check cannot be completed, `verifySync` throws `ApiException` (408, 424 or 500). Don't resubmit automatically: the job may still have run, and resubmitting runs and bills a second lookup.
+
+- On a 408 or 424, the job is recorded. Read its outcome with `smile.verifications().retrieve(e.getJobId())`.
+- On a 500 with a job ID, do the same. If `e.getJobId()` is null, the job wasn't created.
+
+```java
+import com.smileidentity.errors.ApiException;
+import com.smileidentity.generated.models.JobStatus;
+
+try {
+  EnhancedKycResult result = smile.enhancedKyc().verifySync(params);
+} catch (ApiException e) {
+  int code = e.getStatusCode();
+  if ((code == 408 || code == 424 || code == 500) && e.getJobId() != null) {
+    JobStatus status = smile.verifications().retrieve(e.getJobId());
+  }
+}
+```
+
+`verifySync` never sends the client's `defaultCallbackUrl`, because the sync endpoint ignores `callback_url`. It sends a `callbackUrl` only if you set one on the params.
+
 ### Basic KYC
 
 Basic KYC reports whether the details you submit match the ID authority's record. It never returns the record. `verify` queues the check and delivers the result to your callback URL. `verifySync` returns the result directly:

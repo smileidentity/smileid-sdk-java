@@ -44,6 +44,24 @@ class ErrorParserTest {
   }
 
   @Test
+  void carriesTheJobIdOnEveryErrorClass() {
+    int[] statuses = {400, 401, 402, 403, 404, 408, 409, 413, 415, 424, 429, 500};
+    for (int status : statuses) {
+      SmileIDException e = ErrorParser.parse(status, "{}", "req_1", "job_123");
+      assertEquals("job_123", e.getJobId(), "status " + status);
+      assertEquals("req_1", e.getRequestId(), "status " + status);
+      assertEquals(status, e.getStatusCode());
+    }
+  }
+
+  @Test
+  void hasNoJobIdWhenTheResponseHadNone() {
+    assertNull(ErrorParser.parse(408, "{}", null, null).getJobId());
+    assertNull(ErrorParser.parse(408, "{}", null).getJobId());
+    assertNull(new ApiException("local").getJobId());
+  }
+
+  @Test
   void mapsEachHttpStatusToItsClass() {
     assertInstanceOf(InvalidRequestException.class, ErrorParser.parse(400, "{}", null));
     assertInstanceOf(AuthenticationException.class, ErrorParser.parse(401, "{}", null));

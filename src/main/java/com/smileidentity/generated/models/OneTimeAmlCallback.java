@@ -11,6 +11,9 @@ import java.util.Map;
  */
 public final class OneTimeAmlCallback {
 
+  @JsonProperty("job_id")
+  private String jobId;
+
   @JsonProperty("status")
   private String status;
 
@@ -55,6 +58,14 @@ public final class OneTimeAmlCallback {
 
   @JsonProperty("device_signals")
   private Map<String, Object> deviceSignals;
+
+  /**
+   * The Smile job id for this screening. On the POST /v3/aml/sync result it comes from the {@code
+   * SmileID-Job-ID} response header; null when the result was parsed from a callback payload.
+   */
+  public String getJobId() {
+    return jobId;
+  }
 
   public String getStatus() {
     return status;

@@ -2,6 +2,7 @@ package com.smileidentity.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.smileidentity.Version;
 import com.smileidentity.errors.ConnectionException;
 import com.smileidentity.errors.ErrorParser;
@@ -33,6 +34,7 @@ import okio.Buffer;
 public final class Transport {
 
   private static final MediaType JSON_TYPE = MediaType.get("application/json");
+  private static final String JOB_ID_HEADER = "SmileID-Job-ID";
   private static final String USER_AGENT =
       "smileid-sdk-java/"
           + Version.VERSION
@@ -142,11 +144,13 @@ public final class Transport {
       int status;
       String responseBody;
       String requestId;
+      String jobId;
       String retryAfter;
       try (Response response = client.newCall(request).execute()) {
         status = response.code();
         responseBody = response.body() != null ? response.body().string() : null;
         requestId = response.header("X-Request-ID");
+        jobId = response.header(JOB_ID_HEADER); // OkHttp header lookup ignores case.
         retryAfter = response.header("Retry-After");
       } catch (IOException e) {
         if (req.isIdempotent() && retries < maxRetries) {
@@ -161,12 +165,17 @@ public final class Transport {
         retries++;
         continue;
       }
-      return parseResponse(req, status, responseBody, requestId, responseType);
+      return parseResponse(req, status, responseBody, requestId, jobId, responseType);
     }
   }
 
   private <T> T parseResponse(
-      ApiRequest req, int status, String body, String requestId, Class<T> responseType) {
+      ApiRequest req,
+      int status,
+      String body,
+      String requestId,
+      String jobId,
+      Class<T> responseType) {
     if (status >= 200 && status < 300 || (status == 404 && req.isNotFoundReturnsBody())) {
       // A success-path body must be a JSON object (fleet standard, 2026-07-03).
       try {
@@ -177,15 +186,23 @@ public final class Transport {
                   + (body == null || body.isEmpty() ? "an empty body" : "a non-object body"),
               status,
               requestId,
+              jobId,
               body);
+        }
+        if (req.isJobIdFromHeader() && jobId != null) {
+          ((ObjectNode) node).put("job_id", jobId);
         }
         return mapper.treeToValue(node, responseType);
       } catch (IOException e) {
         throw new UnexpectedResponseException(
-            "Expected a JSON object response body: " + e.getMessage(), status, requestId, body);
+            "Expected a JSON object response body: " + e.getMessage(),
+            status,
+            requestId,
+            jobId,
+            body);
       }
     }
-    throw ErrorParser.parse(status, body, requestId);
+    throw ErrorParser.parse(status, body, requestId, jobId);
   }
 
   private Request buildHttpRequest(

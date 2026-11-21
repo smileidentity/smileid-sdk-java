@@ -20,10 +20,11 @@ public final class BasicKycOperations {
       Transport transport, BasicKycParams params, RequestOptions options) {
     return transport.execute(
         request(
-            "/v3/basic_kyc",
-            params,
-            options,
-            OperationSupport.effectiveCallbackUrl(transport, params.getCallbackUrl(), options)),
+                "/v3/basic_kyc",
+                params,
+                options,
+                OperationSupport.effectiveCallbackUrl(transport, params.getCallbackUrl(), options))
+            .build(),
         AcceptedResponse.class);
   }
 
@@ -35,11 +36,13 @@ public final class BasicKycOperations {
       Transport transport, BasicKycParams params, RequestOptions options) {
     Validators.requireHttpsCallbackUrl(params.getCallbackUrl(), "callbackUrl");
     return transport.execute(
-        request("/v3/basic_kyc/sync", params, options, params.getCallbackUrl()),
+        request("/v3/basic_kyc/sync", params, options, params.getCallbackUrl())
+            .jobIdFromHeader(true)
+            .build(),
         BasicKycResult.class);
   }
 
-  private static ApiRequest request(
+  private static ApiRequest.Builder request(
       String path, BasicKycParams params, RequestOptions options, String callbackUrl) {
     List<Part> parts = new ArrayList<>();
     OperationSupport.addText(parts, "country", params.getCountry());
@@ -56,7 +59,6 @@ public final class BasicKycOperations {
         .path(path)
         .authenticated(true)
         .multipart(parts)
-        .options(options)
-        .build();
+        .options(options);
   }
 }

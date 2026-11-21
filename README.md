@@ -133,10 +133,15 @@ EnhancedKycResult result = smile.enhancedKyc().verifySync(EnhancedKycParams.buil
     .consent(consent)
     .build());
 result.getJobId();                 // "job_...", from the SmileID-Job-ID header
+result.getUserId();                // "user_...", from the User-ID header
 result.getStatus();                // "clear", "attention", "block" or "error"
 result.getReason();                // e.g. "medium_risk"; null when clear
 result.getAdditionalProperties();  // every other field of the payload
+result.getResponseSignature();     // the Response-Signature header
+result.getResponseTimestamp();     // the Response-Timestamp header
 ```
+
+The job ID and user ID come from the response headers, or from the body when a header is missing. The response carries the same `Response-Signature` and `Response-Timestamp` headers as a webhook. The result returns them as strings (null when absent) so you can check them with your own webhook verification code. The SDK does not verify them.
 
 If a sync check cannot be completed, `verifySync` throws `ApiException` (408, 424 or 500). Don't resubmit automatically: the job may still have run, and resubmitting runs and bills a second lookup.
 

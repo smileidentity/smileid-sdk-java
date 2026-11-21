@@ -1804,9 +1804,8 @@ class GoldenFixturesTest {
   // The Amberford persona (submitEnhancedKycSync/amberford in smileid-sdk-fixtures), with the spec
   // example's job, user and receipt fields and two fields the spec leaves untyped.
   private static final String ENHANCED_KYC_RESULT =
-      "{\"job_id\":\"job_from_body\",\"user_id\":\""
-          + USER_ID
-          + "\",\"status\":\"attention\",\"reason\":\"medium_risk\","
+      "{\"job_id\":\"job_from_body\",\"user_id\":\"user_from_body\","
+          + "\"status\":\"attention\",\"reason\":\"medium_risk\","
           + "\"message\":\"Verification successful\","
           + "\"kyc_receipt\":\"https://portal.usesmileid.com/api/v3/001/job_result_summary/"
           + JOB_ID
@@ -1825,7 +1824,13 @@ class GoldenFixturesTest {
   @Test
   void enhancedKycVerifySyncMatchesTheGoldenRequestAndParsesTheResult() throws Exception {
     enqueueToken();
-    server.enqueue(TestSupport.json(200, ENHANCED_KYC_RESULT).setHeader("SmileID-Job-ID", JOB_ID));
+    // Header names arrive lower-cased through some proxies; the lookup ignores case.
+    server.enqueue(
+        TestSupport.json(200, ENHANCED_KYC_RESULT)
+            .setHeader("smileid-job-id", JOB_ID)
+            .setHeader("user-id", USER_ID)
+            .setHeader("response-signature", "c2lnbmF0dXJl")
+            .setHeader("response-timestamp", "2026-03-10T12:00:04.000Z"));
 
     EnhancedKycResult result =
         smile.enhancedKyc().verifySync(goldenEnhancedKyc().userId(USER_ID).build());
@@ -1848,7 +1853,9 @@ class GoldenFixturesTest {
     assertEquals(5, parts.size(), "only the five required parts are sent");
 
     assertEquals(JOB_ID, result.getJobId(), "the SmileID-Job-ID header wins over the body");
-    assertEquals(USER_ID, result.getUserId());
+    assertEquals(USER_ID, result.getUserId(), "the User-ID header wins over the body");
+    assertEquals("c2lnbmF0dXJl", result.getResponseSignature());
+    assertEquals("2026-03-10T12:00:04.000Z", result.getResponseTimestamp());
     assertEquals("attention", result.getStatus());
     assertEquals("medium_risk", result.getReason());
     assertEquals("Verification successful", result.getMessage());
@@ -1865,13 +1872,38 @@ class GoldenFixturesTest {
   }
 
   @Test
-  void enhancedKycSyncFallsBackToTheJobIdInTheBody() throws Exception {
+  void enhancedKycSyncFallsBackToTheBodyAndHasNoSignatureWithoutTheHeaders() throws Exception {
     enqueueToken();
-    server.enqueue(TestSupport.json(200, ENHANCED_KYC_RESULT));
+    // A blank User-ID header counts as absent. Signature fields in the body are not headers.
+    server.enqueue(
+        TestSupport.json(
+                200,
+                ENHANCED_KYC_RESULT.replace(
+                    "}}",
+                    "},\"response_signature\":\"from_body\","
+                        + "\"response_timestamp\":\"from_body\"}"))
+            .setHeader("User-ID", " "));
 
     EnhancedKycResult result = smile.enhancedKyc().verifySync(goldenEnhancedKyc().build());
 
     assertEquals("job_from_body", result.getJobId());
+    assertEquals("user_from_body", result.getUserId());
+    assertNull(result.getResponseSignature());
+    assertNull(result.getResponseTimestamp());
+    assertEquals(2, result.getAdditionalProperties().size());
+  }
+
+  @Test
+  void enhancedKycSyncIdsAreNullWhenNeitherHeaderNorBodyHasThem() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, "{\"status\":\"clear\"}"));
+
+    EnhancedKycResult result = smile.enhancedKyc().verifySync(goldenEnhancedKyc().build());
+
+    assertNull(result.getJobId());
+    assertNull(result.getUserId());
+    assertNull(result.getResponseSignature());
+    assertNull(result.getResponseTimestamp());
   }
 
   @ParameterizedTest

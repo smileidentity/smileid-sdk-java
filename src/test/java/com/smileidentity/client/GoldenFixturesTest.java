@@ -1618,6 +1618,46 @@ class GoldenFixturesTest {
   }
 
   @Test
+  void aBlankJobIdHeaderOnAnErrorIsTreatedAsAbsent() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(408, "{\"status\":\"Request Timeout\",\"message\":\"slow\"}")
+            .setHeader("SmileID-Job-ID", "   "));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
+
+    assertNull(e.getJobId());
+  }
+
+  @Test
+  void aJobIdHeaderIsTrimmed() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(408, "{\"status\":\"Request Timeout\",\"message\":\"slow\"}")
+            .setHeader("SmileID-Job-ID", " " + JOB_ID + "\t"));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
+
+    assertEquals(JOB_ID, e.getJobId());
+  }
+
+  @Test
+  void aBlankJobIdHeaderDoesNotOverwriteAJobIdInTheSyncBody() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(200, "{\"status\":\"clear\",\"job_id\":\"job_from_body\"}")
+            .setHeader("SmileID-Job-ID", " "));
+
+    BasicKycResult result = smile.basicKyc().verifySync(goldenBasicKyc().build());
+
+    assertEquals("job_from_body", result.getJobId());
+  }
+
+  @Test
   void basicKycSync500WithoutAJobIdHeaderHasNoJobId() throws Exception {
     // API Gateway's own 500 envelope: the job was never created, so there is no header.
     enqueueToken();

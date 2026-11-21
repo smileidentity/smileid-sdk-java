@@ -152,7 +152,8 @@ import com.smileidentity.generated.models.JobStatus;
 try {
   BasicKycResult result = smile.basicKyc().verifySync(params);
 } catch (ApiException e) {
-  if (e.getJobId() != null) {
+  int code = e.getStatusCode();
+  if ((code == 408 || code == 424 || code == 500) && e.getJobId() != null) {
     JobStatus status = smile.verifications().retrieve(e.getJobId());
   }
 }

@@ -150,7 +150,7 @@ public final class Transport {
         status = response.code();
         responseBody = response.body() != null ? response.body().string() : null;
         requestId = response.header("X-Request-ID");
-        jobId = response.header(JOB_ID_HEADER); // OkHttp header lookup ignores case.
+        jobId = jobIdHeader(response);
         retryAfter = response.header("Retry-After");
       } catch (IOException e) {
         if (req.isIdempotent() && retries < maxRetries) {
@@ -203,6 +203,16 @@ public final class Transport {
       }
     }
     throw ErrorParser.parse(status, body, requestId, jobId);
+  }
+
+  // OkHttp's header lookup ignores case. A blank header is treated as absent.
+  private static String jobIdHeader(Response response) {
+    String value = response.header(JOB_ID_HEADER);
+    if (value == null) {
+      return null;
+    }
+    value = value.trim();
+    return value.isEmpty() ? null : value;
   }
 
   private Request buildHttpRequest(

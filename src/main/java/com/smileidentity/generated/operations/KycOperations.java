@@ -41,6 +41,9 @@ public final class KycOperations {
     return transport.execute(
         request("/v3/enhanced_kyc/sync", params, options, params.getCallbackUrl())
             .jobIdFromHeader(true)
+            .headerField("User-ID", "user_id")
+            .headerOnlyField("Response-Signature", "response_signature")
+            .headerOnlyField("Response-Timestamp", "response_timestamp")
             .build(),
         EnhancedKycResult.class);
   }

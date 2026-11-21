@@ -34,6 +34,12 @@ public final class EnhancedKycResult {
   @JsonProperty("kyc_receipt")
   private String kycReceipt;
 
+  @JsonProperty("response_signature")
+  private String responseSignature;
+
+  @JsonProperty("response_timestamp")
+  private String responseTimestamp;
+
   private final Map<String, Object> additionalProperties = new LinkedHashMap<>();
 
   /**
@@ -45,6 +51,10 @@ public final class EnhancedKycResult {
     return jobId;
   }
 
+  /**
+   * The partner-facing user id. On the POST /v3/enhanced_kyc/sync result it comes from the {@code
+   * User-ID} response header, falling back to the body's {@code user_id} when the header is absent.
+   */
   public String getUserId() {
     return userId;
   }
@@ -64,6 +74,23 @@ public final class EnhancedKycResult {
 
   public String getKycReceipt() {
     return kycReceipt;
+  }
+
+  /**
+   * The {@code Response-Signature} header of the POST /v3/enhanced_kyc/sync response, or null when
+   * it was absent. It is the same signature a webhook carries, so you can check it with your own
+   * webhook verification code. The SDK does not verify it.
+   */
+  public String getResponseSignature() {
+    return responseSignature;
+  }
+
+  /**
+   * The {@code Response-Timestamp} header of the POST /v3/enhanced_kyc/sync response, the timestamp
+   * the signature was computed against, or null when it was absent.
+   */
+  public String getResponseTimestamp() {
+    return responseTimestamp;
   }
 
   /** Every other field of the payload, keyed by its wire name. Never null; read-only. */

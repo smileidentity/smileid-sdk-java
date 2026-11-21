@@ -28,6 +28,8 @@ public final class ApiRequest {
   private final boolean idempotent;
   private final boolean notFoundReturnsBody;
   private final boolean jobIdFromHeader;
+  private final Map<String, String> headerFields;
+  private final Map<String, String> headerOnlyFields;
   private final RequestOptions options;
 
   private ApiRequest(Builder b) {
@@ -44,6 +46,8 @@ public final class ApiRequest {
     this.idempotent = b.idempotent;
     this.notFoundReturnsBody = b.notFoundReturnsBody;
     this.jobIdFromHeader = b.jobIdFromHeader;
+    this.headerFields = Collections.unmodifiableMap(b.headerFields);
+    this.headerOnlyFields = Collections.unmodifiableMap(b.headerOnlyFields);
     this.options = b.options == null ? RequestOptions.none() : b.options;
   }
 
@@ -107,6 +111,22 @@ public final class ApiRequest {
     return jobIdFromHeader;
   }
 
+  /**
+   * Response headers copied into a success body, keyed by header name with the body field as the
+   * value. A header that is present wins over the body's field; an absent one leaves it alone.
+   */
+  public Map<String, String> getHeaderFields() {
+    return headerFields;
+  }
+
+  /**
+   * Response headers copied into a success body, keyed by header name with the body field as the
+   * value. The field is always the header's value, and null when the header is absent.
+   */
+  public Map<String, String> getHeaderOnlyFields() {
+    return headerOnlyFields;
+  }
+
   public RequestOptions getOptions() {
     return options;
   }
@@ -125,6 +145,8 @@ public final class ApiRequest {
     private boolean idempotent;
     private boolean notFoundReturnsBody;
     private boolean jobIdFromHeader;
+    private final Map<String, String> headerFields = new LinkedHashMap<>();
+    private final Map<String, String> headerOnlyFields = new LinkedHashMap<>();
     private RequestOptions options;
 
     public Builder method(String method) {
@@ -190,6 +212,26 @@ public final class ApiRequest {
      */
     public Builder jobIdFromHeader(boolean jobIdFromHeader) {
       this.jobIdFromHeader = jobIdFromHeader;
+      return this;
+    }
+
+    /**
+     * Sets {@code field} on a success body from the {@code header} response header, when the
+     * response has one. The header wins over the body's field; without it the body's field is kept.
+     * Header names are matched case-insensitively, and a blank header counts as absent.
+     */
+    public Builder headerField(String header, String field) {
+      this.headerFields.put(header, field);
+      return this;
+    }
+
+    /**
+     * Sets {@code field} on a success body to the {@code header} response header's value, or to
+     * null when the response has no such header, whatever the body says. Header names are matched
+     * case-insensitively, and a blank header counts as absent.
+     */
+    public Builder headerOnlyField(String header, String field) {
+      this.headerOnlyFields.put(header, field);
       return this;
     }
 

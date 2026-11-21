@@ -48,6 +48,7 @@ public final class AmlOperations {
             .authenticated(true)
             .multipart(oneTimeParts(transport, params, options))
             .idempotent(idempotencyKey != null)
+            .jobIdFromHeader(true)
             .options(options);
     if (idempotencyKey != null) {
       builder.header("SmileID-Idempotency-Key", idempotencyKey);

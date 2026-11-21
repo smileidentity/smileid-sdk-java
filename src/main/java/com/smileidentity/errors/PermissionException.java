@@ -18,4 +18,16 @@ public class PermissionException extends SmileIDException {
       String rawBody) {
     super(message, statusCode, status, code, requestId, rawBody);
   }
+
+  /** As above, also carrying the job id from the SmileID-Job-ID response header (may be null). */
+  public PermissionException(
+      String message,
+      Integer statusCode,
+      String status,
+      String code,
+      String requestId,
+      String jobId,
+      String rawBody) {
+    super(message, statusCode, status, code, requestId, jobId, rawBody, null);
+  }
 }

@@ -135,11 +135,29 @@ BasicKycResult result = smile.basicKyc().verifySync(BasicKycParams.builder()
     .userDetails(user)
     .consent(consent)
     .build());
+result.getJobId();                            // "job_...", from the SmileID-Job-ID header
 result.getStatus();                           // "clear", "attention", "block" or "error"
 result.getMatchResults().getOverall();        // e.g. "exact_match"
 ```
 
-If a sync check cannot be completed, `verifySync` throws `ApiException` (408, 424 or 500). The job may still have run, and resubmitting runs and bills a second lookup, so don't resubmit automatically.
+If a sync check cannot be completed, `verifySync` throws `ApiException` (408, 424 or 500). Don't resubmit automatically: the job may still have run, and resubmitting runs and bills a second lookup.
+
+- On a 408 or 424, the job is recorded. Read its outcome with `smile.verifications().retrieve(e.getJobId())`.
+- On a 500 with a job ID, do the same. If `e.getJobId()` is null, the job wasn't created.
+
+```java
+import com.smileidentity.errors.ApiException;
+import com.smileidentity.generated.models.JobStatus;
+
+try {
+  BasicKycResult result = smile.basicKyc().verifySync(params);
+} catch (ApiException e) {
+  int code = e.getStatusCode();
+  if ((code == 408 || code == 424 || code == 500) && e.getJobId() != null) {
+    JobStatus status = smile.verifications().retrieve(e.getJobId());
+  }
+}
+```
 
 `verifySync` never sends the client's `defaultCallbackUrl`, because the sync endpoint ignores `callback_url`. It sends a `callbackUrl` only if you set one on the params.
 
@@ -185,6 +203,13 @@ OneTimeAmlCallback result = smile.aml().oneTimeSync(
         .consent(Consent.granted("2026-03-06T12:00:00.000Z", "EN", "https://example.com/privacy"))
         .build());
 ```
+
+`result.getJobId()` returns the job ID from the `SmileID-Job-ID` response header.
+
+If the screening cannot be completed, `oneTimeSync` throws `ApiException`:
+
+- On a 408, the provider did not answer in time. Nothing was billed and the job is final in `error`, so reading its status only returns that error. Resubmit the screening instead. Pass an idempotency key with `oneTimeSync(params, idempotencyKey, options)` to make the resubmission safe to repeat; with a key, the SDK also retries a 408 for you.
+- On a 500 with a job ID, read the outcome with `smile.verifications().retrieve(e.getJobId())`. If `e.getJobId()` is null, the job wasn't created.
 
 `smile.aml().oneTime(params)` queues the same screening and delivers the result to your callback URL. `smile.aml().monitoring(params)` enrols the entity for ongoing monitoring, and `smile.aml().monitoringNews(jobId, reference, params)` reads its news media.
 
@@ -376,7 +401,7 @@ smile.services().idStatus("NG", "NIN");
 
 ## Error handling
 
-All errors extend `com.smileidentity.errors.SmileIDException` and expose `getStatusCode()`, `getStatus()`, `getMessage()`, `getCode()`, `getRequestId()` and `getRawBody()`.
+All errors extend `com.smileidentity.errors.SmileIDException` and expose `getStatusCode()`, `getStatus()`, `getMessage()`, `getCode()`, `getRequestId()`, `getJobId()` and `getRawBody()`. `getJobId()` is the `SmileID-Job-ID` response header, or null when the response had none.
 
 | Class | When |
 |---|---|
@@ -389,7 +414,7 @@ All errors extend `com.smileidentity.errors.SmileIDException` and expose `getSta
 | `ConflictException` | HTTP 409: never auto-retried |
 | `PayloadTooLargeException` | HTTP 413 |
 | `RateLimitException` | HTTP 429 |
-| `ApiException` | HTTP 5xx |
+| `ApiException` | HTTP 5xx, and any other status without its own class, such as 408 and 424 from the sync endpoints |
 | `UnexpectedResponseException` | A 2xx response body that is not a JSON object |
 | `ConnectionException` | Network failure or timeout, no HTTP response |
 | `TimeoutException` | `waitUntilComplete` deadline passed |

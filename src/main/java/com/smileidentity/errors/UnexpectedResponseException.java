@@ -13,4 +13,10 @@ public class UnexpectedResponseException extends SmileIDException {
       String message, Integer statusCode, String requestId, String rawBody) {
     super(message, statusCode, null, null, requestId, rawBody);
   }
+
+  /** As above, also carrying the job id from the SmileID-Job-ID response header (may be null). */
+  public UnexpectedResponseException(
+      String message, Integer statusCode, String requestId, String jobId, String rawBody) {
+    super(message, statusCode, null, null, requestId, jobId, rawBody, null);
+  }
 }

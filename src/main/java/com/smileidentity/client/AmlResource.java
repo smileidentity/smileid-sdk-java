@@ -37,8 +37,11 @@ public final class AmlResource {
   }
 
   /**
-   * POST /v3/aml/sync — screens inline and returns the terminal result. Slower than {@link
-   * #oneTime}; a 408 means the provider did not answer in time and nothing was billed.
+   * POST /v3/aml/sync — screens inline and returns the terminal result, with the job id from the
+   * {@code SmileID-Job-ID} header. Slower than {@link #oneTime}. A 408 means the provider did not
+   * answer in time, nothing was billed and the job is final in error: resubmit rather than poll. On
+   * a 500 with a job id ({@code e.getJobId()}), read the outcome with {@code
+   * verifications().retrieve}.
    */
   public OneTimeAmlCallback oneTimeSync(OneTimeAmlParams params) {
     return oneTimeSync(params, null, RequestOptions.none());

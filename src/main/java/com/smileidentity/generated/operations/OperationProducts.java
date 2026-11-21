@@ -27,6 +27,8 @@ public final class OperationProducts {
     m.put("/v3/aml/monitoring/{job_id}/news/{reference}", "aml");
     m.put("/v3/aml/sync", "one_time_aml");
     m.put("/v3/authentication", "smart_selfie_authentication");
+    m.put("/v3/basic_kyc", "basic_kyc");
+    m.put("/v3/basic_kyc/sync", "basic_kyc");
     m.put("/v3/biometric_kyc", "biometric_kyc");
     m.put("/v3/compare", "smart_selfie_compare");
     m.put("/v3/document_verification", "document_verification");

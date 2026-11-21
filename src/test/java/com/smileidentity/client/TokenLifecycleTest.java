@@ -15,6 +15,7 @@ import com.smileidentity.errors.UnexpectedResponseException;
 import com.smileidentity.errors.ValidationException;
 import com.smileidentity.generated.models.AcceptedResponse;
 import com.smileidentity.generated.models.AuthenticationParams;
+import com.smileidentity.generated.models.BasicKycParams;
 import com.smileidentity.generated.models.BiometricKycParams;
 import com.smileidentity.generated.models.CompareParams;
 import com.smileidentity.generated.models.ComparisonImageType;
@@ -102,6 +103,16 @@ class TokenLifecycleTest {
     smile.enhancedKyc().verify(enhancedKycParams(userId));
   }
 
+  private static BasicKycParams basicKycParams() {
+    return BasicKycParams.builder()
+        .country("NG")
+        .idType("NIN")
+        .idNumber("12345678901")
+        .userDetails(user())
+        .consent(consent())
+        .build();
+  }
+
   private static EnhancedKycParams enhancedKycParams(String userId) {
     return EnhancedKycParams.builder()
         .country("NG")
@@ -148,6 +159,14 @@ class TokenLifecycleTest {
 
   private static Arguments operation(String name, String path, Consumer<SmileID> call) {
     return Arguments.of(name, path, call);
+  }
+
+  // Basic KYC has no user_id, so its token binds only the product.
+  private static Stream<Arguments> basicKycOperations() {
+    return Stream.of(
+        operation("basic_kyc", "/v3/basic_kyc", c -> c.basicKyc().verify(basicKycParams())),
+        operation(
+            "basic_kyc", "/v3/basic_kyc/sync", c -> c.basicKyc().verifySync(basicKycParams())));
   }
 
   private static Stream<Arguments> jobOperations() {
@@ -328,6 +347,21 @@ class TokenLifecycleTest {
     assertEquals("/v3/token", tokenReq.getPath());
     assertEquals(0, tokenReq.getBodySize());
     assertEquals(path, server.takeRequest().getRequestUrl().encodedPath());
+  }
+
+  @ParameterizedTest(name = "{1}")
+  @MethodSource("basicKycOperations")
+  void basicKycTokenBindsOnlyItsProduct(String product, String path, Consumer<SmileID> call)
+      throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(202, ACCEPTED));
+
+    call.accept(smile);
+
+    assertEquals(claims("product", product), claims(server.takeRequest()));
+    RecordedRequest job = server.takeRequest();
+    assertEquals(path, job.getPath());
+    assertNull(job.getHeader("User-ID"));
   }
 
   @Test

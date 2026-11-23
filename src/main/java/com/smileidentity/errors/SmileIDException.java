@@ -5,8 +5,9 @@ package com.smileidentity.errors;
  *
  * <p>Every error exposes the HTTP status code (null for connection or local errors), the HTTP
  * status text from the body when present, the human-readable message, the service error code when
- * present (only on the {@code {error, code}} wire shape), the request id when one exists, and the
- * unparsed response body.
+ * present (only on the {@code {error, code}} wire shape), the request id when one exists, the job
+ * id from the {@code SmileID-Job-ID} response header when the API sent one, and the unparsed
+ * response body.
  */
 public class SmileIDException extends RuntimeException {
 
@@ -16,6 +17,7 @@ public class SmileIDException extends RuntimeException {
   private final String status;
   private final String code;
   private final String requestId;
+  private final String jobId;
   private final String rawBody;
 
   public SmileIDException(String message) {
@@ -44,11 +46,25 @@ public class SmileIDException extends RuntimeException {
       String requestId,
       String rawBody,
       Throwable cause) {
+    this(message, statusCode, status, code, requestId, null, rawBody, cause);
+  }
+
+  /** As the constructor above, also carrying the job id from the SmileID-Job-ID header. */
+  public SmileIDException(
+      String message,
+      Integer statusCode,
+      String status,
+      String code,
+      String requestId,
+      String jobId,
+      String rawBody,
+      Throwable cause) {
     super(message, cause);
     this.statusCode = statusCode;
     this.status = status;
     this.code = code;
     this.requestId = requestId;
+    this.jobId = jobId;
     this.rawBody = rawBody;
   }
 
@@ -70,6 +86,15 @@ public class SmileIDException extends RuntimeException {
   /** Request id from a response header when one exists, or null. */
   public String getRequestId() {
     return requestId;
+  }
+
+  /**
+   * The job id from the {@code SmileID-Job-ID} response header, or null when the response had none
+   * (and for connection and local errors). When a sync call fails with a job id, the job was
+   * created: read its outcome with {@code verifications().retrieve(jobId)}.
+   */
+  public String getJobId() {
+    return jobId;
   }
 
   /** The unparsed response body, or null. */

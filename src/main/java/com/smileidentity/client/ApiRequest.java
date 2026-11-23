@@ -27,6 +27,7 @@ public final class ApiRequest {
   private final Object jsonBody;
   private final boolean idempotent;
   private final boolean notFoundReturnsBody;
+  private final boolean jobIdFromHeader;
   private final RequestOptions options;
 
   private ApiRequest(Builder b) {
@@ -42,6 +43,7 @@ public final class ApiRequest {
     this.jsonBody = b.jsonBody;
     this.idempotent = b.idempotent;
     this.notFoundReturnsBody = b.notFoundReturnsBody;
+    this.jobIdFromHeader = b.jobIdFromHeader;
     this.options = b.options == null ? RequestOptions.none() : b.options;
   }
 
@@ -97,6 +99,14 @@ public final class ApiRequest {
     return notFoundReturnsBody;
   }
 
+  /**
+   * True when a success body's {@code job_id} is taken from the {@code SmileID-Job-ID} response
+   * header (sync endpoints, whose result body carries no job id).
+   */
+  public boolean isJobIdFromHeader() {
+    return jobIdFromHeader;
+  }
+
   public RequestOptions getOptions() {
     return options;
   }
@@ -114,6 +124,7 @@ public final class ApiRequest {
     private Object jsonBody;
     private boolean idempotent;
     private boolean notFoundReturnsBody;
+    private boolean jobIdFromHeader;
     private RequestOptions options;
 
     public Builder method(String method) {
@@ -170,6 +181,15 @@ public final class ApiRequest {
 
     public Builder notFoundReturnsBody(boolean notFoundReturnsBody) {
       this.notFoundReturnsBody = notFoundReturnsBody;
+      return this;
+    }
+
+    /**
+     * Sets {@code job_id} on a success body from the {@code SmileID-Job-ID} response header, when
+     * the response has one. The header wins over any {@code job_id} in the body.
+     */
+    public Builder jobIdFromHeader(boolean jobIdFromHeader) {
+      this.jobIdFromHeader = jobIdFromHeader;
       return this;
     }
 

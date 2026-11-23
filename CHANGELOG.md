@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * `verify(params)` — `POST /v3/basic_kyc`. Returns `AcceptedResponse`; the result goes to the callback URL.
   * `verifySync(params)` — `POST /v3/basic_kyc/sync`. Returns the terminal `BasicKycResult`. It is never retried, because a retry would bill a second lookup. It never sends the client's default callback URL, because the sync endpoint ignores `callback_url`.
 * Tokens for both Basic KYC paths are bound to the `basic_kyc` product.
+* `SmileIDException.getJobId()` returns the job ID from the `SmileID-Job-ID` response header, or null when the response had none. It is set on every error raised from an HTTP response, including `UnexpectedResponseException`. On a Basic KYC sync 408, 424 or 500 with a job ID, or an AML sync 500 with a job ID, read the outcome with `verifications().retrieve(e.getJobId())` instead of resubmitting. Each HTTP error class gains a constructor that takes the job ID, and `ErrorParser` gains `parse(statusCode, rawBody, requestId, jobId)`.
+* `BasicKycResult.getJobId()` and `OneTimeAmlCallback.getJobId()` return the job ID from the `SmileID-Job-ID` header of the `verifySync` and `oneTimeSync` responses. They are null when the result was parsed from a callback payload.
+* `ApiRequest.Builder.jobIdFromHeader(boolean)` copies the `SmileID-Job-ID` response header into the result's `job_id`.
 
 ## [13.1.0] - 2026-11-19
 

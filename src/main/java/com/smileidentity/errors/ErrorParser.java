@@ -17,6 +17,15 @@ public final class ErrorParser {
   private ErrorParser() {}
 
   public static SmileIDException parse(int statusCode, String rawBody, String requestId) {
+    return parse(statusCode, rawBody, requestId, null);
+  }
+
+  /**
+   * As {@link #parse(int, String, String)}, also carrying {@code jobId}: the value of the
+   * response's {@code SmileID-Job-ID} header, or null when it had none.
+   */
+  public static SmileIDException parse(
+      int statusCode, String rawBody, String requestId, String jobId) {
     String status = null;
     String message = null;
     String code = null;
@@ -38,32 +47,38 @@ public final class ErrorParser {
     if (message == null) {
       message = defaultReason(statusCode);
     }
-    return build(statusCode, status, message, code, requestId, rawBody);
+    return build(statusCode, status, message, code, requestId, jobId, rawBody);
   }
 
   private static SmileIDException build(
-      int statusCode, String status, String message, String code, String requestId, String raw) {
+      int statusCode,
+      String status,
+      String message,
+      String code,
+      String requestId,
+      String jobId,
+      String raw) {
     Integer sc = statusCode;
     switch (statusCode) {
       case 400:
       case 415:
-        return new InvalidRequestException(message, sc, status, code, requestId, raw);
+        return new InvalidRequestException(message, sc, status, code, requestId, jobId, raw);
       case 401:
-        return new AuthenticationException(message, sc, status, code, requestId, raw);
+        return new AuthenticationException(message, sc, status, code, requestId, jobId, raw);
       case 402:
-        return new PaymentRequiredException(message, sc, status, code, requestId, raw);
+        return new PaymentRequiredException(message, sc, status, code, requestId, jobId, raw);
       case 403:
-        return new PermissionException(message, sc, status, code, requestId, raw);
+        return new PermissionException(message, sc, status, code, requestId, jobId, raw);
       case 404:
-        return new NotFoundException(message, sc, status, code, requestId, raw);
+        return new NotFoundException(message, sc, status, code, requestId, jobId, raw);
       case 409:
-        return new ConflictException(message, sc, status, code, requestId, raw);
+        return new ConflictException(message, sc, status, code, requestId, jobId, raw);
       case 413:
-        return new PayloadTooLargeException(message, sc, status, code, requestId, raw);
+        return new PayloadTooLargeException(message, sc, status, code, requestId, jobId, raw);
       case 429:
-        return new RateLimitException(message, sc, status, code, requestId, raw);
+        return new RateLimitException(message, sc, status, code, requestId, jobId, raw);
       default:
-        return new ApiException(message, sc, status, code, requestId, raw);
+        return new ApiException(message, sc, status, code, requestId, jobId, raw);
     }
   }
 

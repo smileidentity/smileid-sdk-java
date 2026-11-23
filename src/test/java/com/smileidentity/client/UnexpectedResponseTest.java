@@ -42,6 +42,23 @@ class UnexpectedResponseTest {
     assertEquals(200, e.getStatusCode());
     assertEquals("<html>gateway interference</html>", e.getRawBody());
     assertEquals("req_42", e.getRequestId());
+    assertEquals(null, e.getJobId());
+  }
+
+  @Test
+  void nonObjectSuccessBodyCarriesTheJobIdHeader() {
+    server.enqueue(TestSupport.json(200, "[1]").setHeader("SmileID-Job-ID", "job_7"));
+    UnexpectedResponseException e =
+        assertThrows(UnexpectedResponseException.class, () -> smile.services().bankCodes());
+    assertEquals("job_7", e.getJobId());
+  }
+
+  @Test
+  void unparseableSuccessBodyCarriesTheJobIdHeader() {
+    server.enqueue(TestSupport.json(200, "{not json").setHeader("SmileID-Job-ID", "job_8"));
+    UnexpectedResponseException e =
+        assertThrows(UnexpectedResponseException.class, () -> smile.services().bankCodes());
+    assertEquals("job_8", e.getJobId());
   }
 
   @Test

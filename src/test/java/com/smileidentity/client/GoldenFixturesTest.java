@@ -988,6 +988,7 @@ class GoldenFixturesTest {
     assertEquals("[\"NG\",\"KE\"]", MultipartParser.single(parts, "countries").body);
     assertFalse(MultipartParser.has(parts, "callback_url"), "callback_url is optional on sync");
 
+    assertEquals(JOB_ID, result.getJobId());
     assertEquals("block", result.getStatus());
     assertEquals("Screening completed: potential matches identified.", result.getMessage());
     assertEquals("aml_match_found", result.getReason());
@@ -1036,6 +1037,7 @@ class GoldenFixturesTest {
     OneTimeAmlCallback result = smile.aml().oneTimeSync(goldenOneTime().build());
 
     assertEquals("block", result.getStatus());
+    assertNull(result.getJobId(), "no SmileID-Job-ID header, so no job id");
     server.takeRequest(); // token
     assertNull(server.takeRequest().getHeader("SmileID-Idempotency-Key"));
   }
@@ -1445,6 +1447,7 @@ class GoldenFixturesTest {
     BasicKycResult result = smile.basicKyc().verifySync(goldenBasicKyc().build());
 
     assertGoldenBasicKycParts(takeBasicKycRequest("/v3/basic_kyc/sync", "basic_kyc"));
+    assertNull(result.getJobId(), "no SmileID-Job-ID header, so no job id");
     assertEquals("attention", result.getStatus());
     assertEquals("Verification completed: partial match.", result.getMessage());
     assertEquals("no_comparable_fields", result.getReason());
@@ -1536,6 +1539,189 @@ class GoldenFixturesTest {
     assertEquals("/v3/basic_kyc/sync", server.takeRequest().getPath());
     // Exactly one sync request: the token fetch plus the single sync call.
     assertEquals(2, server.getRequestCount());
+  }
+
+  @Test
+  void basicKycSyncReturnsTheJobIdFromTheResponseHeader() throws Exception {
+    enqueueToken();
+    server.enqueue(TestSupport.json(200, BASIC_KYC_RESULT).setHeader("SmileID-Job-ID", JOB_ID));
+
+    BasicKycResult result = smile.basicKyc().verifySync(goldenBasicKyc().build());
+
+    assertEquals(JOB_ID, result.getJobId());
+    assertEquals("attention", result.getStatus());
+  }
+
+  @Test
+  void syncJobIdHeaderWinsOverAJobIdInTheBody() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(200, "{\"status\":\"clear\",\"job_id\":\"job_from_body\"}")
+            .setHeader("SmileID-Job-ID", JOB_ID));
+
+    BasicKycResult result = smile.basicKyc().verifySync(goldenBasicKyc().build());
+
+    assertEquals(JOB_ID, result.getJobId());
+  }
+
+  @Test
+  void basicKycSync408CarriesTheJobIdAndIsNotRetried() throws Exception {
+    // A second response is queued so that a retry would succeed and show up in the count.
+    smile.transport().setSleeper(millis -> {});
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+                408, "{\"status\":\"Request Timeout\",\"message\":\"The ID authority timed out.\"}")
+            .setHeader("SmileID-Job-ID", JOB_ID));
+    server.enqueue(TestSupport.json(200, BASIC_KYC_RESULT));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
+
+    assertEquals(408, e.getStatusCode());
+    assertEquals(JOB_ID, e.getJobId());
+    assertEquals(2, server.getRequestCount());
+  }
+
+  @Test
+  void basicKycSync424CarriesTheJobIdAndIsNotRetried() throws Exception {
+    smile.transport().setSleeper(millis -> {});
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+                424, "{\"status\":\"Failed Dependency\",\"message\":\"ID authority unavailable.\"}")
+            .setHeader("SmileID-Job-ID", JOB_ID));
+    server.enqueue(TestSupport.json(200, BASIC_KYC_RESULT));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
+
+    assertEquals(424, e.getStatusCode());
+    assertEquals(JOB_ID, e.getJobId());
+    assertEquals(2, server.getRequestCount());
+  }
+
+  @Test
+  void basicKycSyncJobIdHeaderIsReadCaseInsensitively() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(408, "{\"status\":\"Request Timeout\",\"message\":\"slow\"}")
+            .setHeader("smileid-job-id", JOB_ID));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
+
+    assertEquals(JOB_ID, e.getJobId());
+  }
+
+  @Test
+  void aBlankJobIdHeaderOnAnErrorIsTreatedAsAbsent() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(408, "{\"status\":\"Request Timeout\",\"message\":\"slow\"}")
+            .setHeader("SmileID-Job-ID", "   "));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
+
+    assertNull(e.getJobId());
+  }
+
+  @Test
+  void aJobIdHeaderIsTrimmed() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(408, "{\"status\":\"Request Timeout\",\"message\":\"slow\"}")
+            .setHeader("SmileID-Job-ID", " " + JOB_ID + "\t"));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
+
+    assertEquals(JOB_ID, e.getJobId());
+  }
+
+  @Test
+  void aBlankJobIdHeaderDoesNotOverwriteAJobIdInTheSyncBody() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(200, "{\"status\":\"clear\",\"job_id\":\"job_from_body\"}")
+            .setHeader("SmileID-Job-ID", " "));
+
+    BasicKycResult result = smile.basicKyc().verifySync(goldenBasicKyc().build());
+
+    assertEquals("job_from_body", result.getJobId());
+  }
+
+  @Test
+  void basicKycSync500WithoutAJobIdHeaderHasNoJobId() throws Exception {
+    // API Gateway's own 500 envelope: the job was never created, so there is no header.
+    enqueueToken();
+    server.enqueue(TestSupport.json(500, "{\"message\":\"Internal server error\"}"));
+
+    ApiException e =
+        assertThrows(
+            ApiException.class, () -> smile.basicKyc().verifySync(goldenBasicKyc().build()));
+
+    assertEquals(500, e.getStatusCode());
+    assertNull(e.getJobId());
+  }
+
+  @Test
+  void basicKycSyncTimeoutIsResolvedByReadingTheStatusWithTheErrorsJobId() throws Exception {
+    // The README's advice for a 408: don't resubmit; read the outcome with the job id instead.
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+                408, "{\"status\":\"Request Timeout\",\"message\":\"The ID authority timed out.\"}")
+            .setHeader("SmileID-Job-ID", JOB_ID));
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(
+            200,
+            "{\"status\":\"error\",\"job_id\":\""
+                + JOB_ID
+                + "\",\"user_id\":\"user_01h8x9y2z3a4b5c6d7e8f9g0h1\","
+                + "\"message\":\"The ID authority timed out.\"}"));
+
+    JobStatus status;
+    try {
+      smile.basicKyc().verifySync(goldenBasicKyc().build());
+      throw new AssertionError("expected the 408 to throw");
+    } catch (ApiException e) {
+      assertEquals(408, e.getStatusCode());
+      status = smile.verifications().retrieve(e.getJobId());
+    }
+
+    assertEquals("/v3/token", server.takeRequest().getPath());
+    assertEquals("/v3/basic_kyc/sync", server.takeRequest().getPath());
+    assertEquals("/v3/token", server.takeRequest().getPath());
+    RecordedRequest r = server.takeRequest();
+    assertEquals("GET", r.getMethod());
+    assertEquals("/v3/status/" + JOB_ID, r.getPath());
+    assertEquals(4, server.getRequestCount(), "the sync call was not resubmitted");
+    assertTrue(status.isComplete());
+    assertEquals("error", status.getStatus());
+    assertEquals(JOB_ID, status.getJobId());
+    assertEquals("The ID authority timed out.", status.getMessage());
+  }
+
+  @Test
+  void oneTimeAmlSync408CarriesTheJobId() throws Exception {
+    enqueueToken();
+    server.enqueue(
+        TestSupport.json(408, "{\"status\":\"Request Timeout\",\"message\":\"slow\"}")
+            .setHeader("SmileID-Job-ID", JOB_ID));
+
+    ApiException e =
+        assertThrows(ApiException.class, () -> smile.aml().oneTimeSync(goldenOneTime().build()));
+
+    assertEquals(408, e.getStatusCode());
+    assertEquals(JOB_ID, e.getJobId());
   }
 
   @Test

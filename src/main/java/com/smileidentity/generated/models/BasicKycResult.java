@@ -11,6 +11,9 @@ import java.util.Map;
  */
 public final class BasicKycResult {
 
+  @JsonProperty("job_id")
+  private String jobId;
+
   @JsonProperty("status")
   private String status;
 
@@ -49,6 +52,15 @@ public final class BasicKycResult {
 
   @JsonProperty("kyc_receipt")
   private String kycReceipt;
+
+  /**
+   * The Smile job id for this verification. On the POST /v3/basic_kyc/sync result it comes from the
+   * {@code SmileID-Job-ID} response header; null when the result was parsed from a callback
+   * payload.
+   */
+  public String getJobId() {
+    return jobId;
+  }
 
   public String getStatus() {
     return status;

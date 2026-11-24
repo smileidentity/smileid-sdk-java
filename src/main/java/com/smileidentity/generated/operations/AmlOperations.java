@@ -49,6 +49,9 @@ public final class AmlOperations {
             .multipart(oneTimeParts(transport, params, options))
             .idempotent(idempotencyKey != null)
             .jobIdFromHeader(true)
+            .headerField("User-ID", "user_id")
+            .headerOnlyField("Response-Signature", "response_signature")
+            .headerOnlyField("Response-Timestamp", "response_timestamp")
             .options(options);
     if (idempotencyKey != null) {
       builder.header("SmileID-Idempotency-Key", idempotencyKey);

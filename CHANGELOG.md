@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* `address()` resource: `verify(params)` — `POST /v3/address`. Returns `AddressAcceptedResponse`; the result goes to the callback URL. The token is bound to the `address_verification` product.
+* `phone()` resource: `verify(params)` — `POST /v3/phone`. Returns `AcceptedResponse`; the result goes to the callback URL. The token is bound to the `phone_number_verification` product.
+* `smileLinks()` resource for the Smile Link operations, whose tokens carry no product claim:
+  * `create(params)` — `POST /v3/smile_links`. Returns `SmileLinkCreated`.
+  * `get(refId)` — `GET /v3/smile_links/{refId}`. Returns `SmileLinkResource`.
+  * `update(refId, params)` — `PUT /v3/smile_links/{refId}`. Changes `id_types` and/or `is_disabled` and returns `SmileLinkResource`.
+  * `list()` and `list(params)` — `GET /v3/smile_links`. Returns `SmileLinkListResponse` with per-link job stats. `get` and `list` are retried; `create` and `update` are not.
+* `BasicKycResult` and `OneTimeAmlCallback` gain `getUserId()`, `getResponseSignature()` and `getResponseTimestamp()`. They return the `User-ID`, `Response-Signature` and `Response-Timestamp` headers of the `verifySync` and `oneTimeSync` responses, or null when absent, and are null on a result parsed from a callback payload. The SDK does not verify the signature.
+
 ## [13.2.0] - 2026-11-24
 
 ### Added

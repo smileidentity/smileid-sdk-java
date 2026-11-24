@@ -37,5 +37,7 @@ class OperationProductsTest {
   void operationsWithoutAProductHaveNone() {
     assertNull(OperationProducts.forPath("/v3/status/job-1"));
     assertNull(OperationProducts.forPath("/v3/services/bank_codes"));
+    assertNull(OperationProducts.forPath("/v3/smile_links"));
+    assertNull(OperationProducts.forPath("/v3/smile_links/{refId}"));
   }
 }

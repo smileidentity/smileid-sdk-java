@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import okhttp3.Headers;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -146,12 +147,14 @@ public final class Transport {
       String requestId;
       String jobId;
       String retryAfter;
+      Headers headers;
       try (Response response = client.newCall(request).execute()) {
         status = response.code();
         responseBody = response.body() != null ? response.body().string() : null;
         requestId = response.header("X-Request-ID");
         jobId = jobIdHeader(response);
         retryAfter = response.header("Retry-After");
+        headers = response.headers();
       } catch (IOException e) {
         if (req.isIdempotent() && retries < maxRetries) {
           backoff(retries, null);
@@ -165,7 +168,7 @@ public final class Transport {
         retries++;
         continue;
       }
-      return parseResponse(req, status, responseBody, requestId, jobId, responseType);
+      return parseResponse(req, status, responseBody, requestId, jobId, headers, responseType);
     }
   }
 
@@ -175,6 +178,7 @@ public final class Transport {
       String body,
       String requestId,
       String jobId,
+      Headers headers,
       Class<T> responseType) {
     if (status >= 200 && status < 300 || (status == 404 && req.isNotFoundReturnsBody())) {
       // A success-path body must be a JSON object (fleet standard, 2026-07-03).
@@ -189,8 +193,18 @@ public final class Transport {
               jobId,
               body);
         }
+        ObjectNode object = (ObjectNode) node;
         if (req.isJobIdFromHeader() && jobId != null) {
-          ((ObjectNode) node).put("job_id", jobId);
+          object.put("job_id", jobId);
+        }
+        for (Map.Entry<String, String> h : req.getHeaderFields().entrySet()) {
+          String value = headerValue(headers, h.getKey());
+          if (value != null) {
+            object.put(h.getValue(), value);
+          }
+        }
+        for (Map.Entry<String, String> h : req.getHeaderOnlyFields().entrySet()) {
+          object.put(h.getValue(), headerValue(headers, h.getKey()));
         }
         return mapper.treeToValue(node, responseType);
       } catch (IOException e) {
@@ -207,7 +221,11 @@ public final class Transport {
 
   // OkHttp's header lookup ignores case. A blank header is treated as absent.
   private static String jobIdHeader(Response response) {
-    String value = response.header(JOB_ID_HEADER);
+    return headerValue(response.headers(), JOB_ID_HEADER);
+  }
+
+  private static String headerValue(Headers headers, String name) {
+    String value = headers.get(name);
     if (value == null) {
       return null;
     }

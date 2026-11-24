@@ -41,3 +41,14 @@ jobs:
         run: ./gradlew build test -PtestJavaVersion=${{ matrix.test-java-version }}
       - name: Example app tests
         run: ./gradlew -p example build
+
+  # Checks spec-coverage.json against the whole spec at its spec_tag.
+  # SpecCoverageTest checks it against the code.
+  spec-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: smileidentity/central-workflows/.github/actions/spec-coverage@cccc8dc1eea22671b2ad4c0ca15f03980a1879e0 # main

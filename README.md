@@ -180,7 +180,12 @@ BasicKycResult result = smile.basicKyc().verifySync(BasicKycParams.builder()
 result.getJobId();                            // "job_...", from the SmileID-Job-ID header
 result.getStatus();                           // "clear", "attention", "block" or "error"
 result.getMatchResults().getOverall();        // e.g. "exact_match"
+result.getUserId();                           // from the User-ID header, or null
+result.getResponseSignature();                // from the Response-Signature header, or null
+result.getResponseTimestamp();                // from the Response-Timestamp header, or null
 ```
+
+The signature is the same one a webhook carries, so you can check it with your own webhook verification code. The SDK doesn't verify it. `smile.aml().oneTimeSync(...)` returns the same three getters.
 
 If a sync check cannot be completed, `verifySync` throws `ApiException` (408, 424 or 500). Don't resubmit automatically: the job may still have run, and resubmitting runs and bills a second lookup.
 
@@ -254,6 +259,62 @@ If the screening cannot be completed, `oneTimeSync` throws `ApiException`:
 - On a 500 with a job ID, read the outcome with `smile.verifications().retrieve(e.getJobId())`. If `e.getJobId()` is null, the job wasn't created.
 
 `smile.aml().oneTime(params)` queues the same screening and delivers the result to your callback URL. `smile.aml().monitoring(params)` enrols the entity for ongoing monitoring, and `smile.aml().monitoringNews(jobId, reference, params)` reads its news media.
+
+### Address verification
+
+`address().verify` queues an address verification and delivers the result to your callback URL. Nigeria needs `utilityNumber`, `utilityProvider` and `utilityType`; South Africa needs `idNumber`:
+
+```java
+import com.smileidentity.generated.models.AddressAcceptedResponse;
+import com.smileidentity.generated.models.AddressVerificationParams;
+
+AddressAcceptedResponse accepted = smile.address().verify(AddressVerificationParams.builder()
+    .address("12 Test Road, Testville").country("NG")
+    .utilityNumber("0123456789").utilityProvider("IKEDC").utilityType("PrePaid")
+    .userDetails(user)
+    .consent(consent)
+    .build());
+accepted.getJobId();
+```
+
+### Phone number verification
+
+`phone().verify` queues a check of a phone number against its registration. Kenya needs `idNumber` and Ghana needs `operator`:
+
+```java
+import com.smileidentity.generated.models.PhoneVerificationParams;
+
+AcceptedResponse accepted = smile.phone().verify(PhoneVerificationParams.builder()
+    .country("GH").phoneNumber("+233241234567").operator("MTN")
+    .userDetails(user)
+    .consent(consent)
+    .build());
+```
+
+### Smile Links
+
+`smileLinks()` creates and manages links you hand to end users. `get` and `list` are retried like other lookups. `create` and `update` are never retried.
+
+```java
+import com.smileidentity.generated.models.SmileLinkCreateParams;
+import com.smileidentity.generated.models.SmileLinkIdType;
+import com.smileidentity.generated.models.SmileLinkListParams;
+import com.smileidentity.generated.models.SmileLinkUpdateParams;
+import java.util.Collections;
+
+SmileLinkCreated created = smile.smileLinks().create(SmileLinkCreateParams.builder()
+    .idTypes(Collections.singletonList(new SmileLinkIdType("NG", "NIN", "enhanced_kyc")))
+    .name("Onboarding")
+    .noticePrivacyPolicyUrl("https://partner.example/privacy")
+    .isSingleUse(false)
+    .build());
+created.getLink();                  // the URL to give the end user
+smile.smileLinks().get(created.getRefId());
+smile.smileLinks().update(created.getRefId(), SmileLinkUpdateParams.builder().isDisabled(true).build());
+smile.smileLinks().list(SmileLinkListParams.builder().limit(20).page(1).singleUse(false).build());
+```
+
+`create` sends the client's `defaultCallbackUrl` when the params set no `callbackUrl`.
 
 ### Enhanced document verification
 

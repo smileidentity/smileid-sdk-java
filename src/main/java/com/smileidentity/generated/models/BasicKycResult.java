@@ -14,6 +14,15 @@ public final class BasicKycResult {
   @JsonProperty("job_id")
   private String jobId;
 
+  @JsonProperty("user_id")
+  private String userId;
+
+  @JsonProperty("response_signature")
+  private String responseSignature;
+
+  @JsonProperty("response_timestamp")
+  private String responseTimestamp;
+
   @JsonProperty("status")
   private String status;
 
@@ -60,6 +69,32 @@ public final class BasicKycResult {
    */
   public String getJobId() {
     return jobId;
+  }
+
+  /**
+   * The partner-facing user id, from the {@code User-ID} response header of the POST
+   * /v3/basic_kyc/sync response; null when the header was absent or the result was parsed from a
+   * callback payload.
+   */
+  public String getUserId() {
+    return userId;
+  }
+
+  /**
+   * The {@code Response-Signature} header of the POST /v3/basic_kyc/sync response, or null when it
+   * was absent. It is the same signature a webhook carries, so you can check it with your own
+   * webhook verification code. The SDK does not verify it.
+   */
+  public String getResponseSignature() {
+    return responseSignature;
+  }
+
+  /**
+   * The {@code Response-Timestamp} header of the POST /v3/basic_kyc/sync response, the timestamp
+   * the signature was computed against, or null when it was absent.
+   */
+  public String getResponseTimestamp() {
+    return responseTimestamp;
   }
 
   public String getStatus() {

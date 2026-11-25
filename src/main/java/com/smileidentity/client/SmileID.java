@@ -22,6 +22,9 @@ public final class SmileID {
   private final UsersResource users;
   private final ServicesResource services;
   private final AmlResource aml;
+  private final AddressResource address;
+  private final PhoneResource phone;
+  private final SmileLinksResource smileLinks;
 
   private SmileID(Transport transport) {
     this.transport = transport;
@@ -34,6 +37,9 @@ public final class SmileID {
     this.users = new UsersResource(transport);
     this.services = new ServicesResource(transport);
     this.aml = new AmlResource(transport);
+    this.address = new AddressResource(transport);
+    this.phone = new PhoneResource(transport);
+    this.smileLinks = new SmileLinksResource(transport);
   }
 
   public static Builder builder() {
@@ -83,6 +89,21 @@ public final class SmileID {
   /** One-Time AML screening and AML Monitoring. */
   public AmlResource aml() {
     return aml;
+  }
+
+  /** POST /v3/address. */
+  public AddressResource address() {
+    return address;
+  }
+
+  /** POST /v3/phone. */
+  public PhoneResource phone() {
+    return phone;
+  }
+
+  /** Smile Link create, read, update and list. */
+  public SmileLinksResource smileLinks() {
+    return smileLinks;
   }
 
   // Internal: exposed for tests in this package.

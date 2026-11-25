@@ -38,6 +38,9 @@ public final class BasicKycOperations {
     return transport.execute(
         request("/v3/basic_kyc/sync", params, options, params.getCallbackUrl())
             .jobIdFromHeader(true)
+            .headerField("User-ID", "user_id")
+            .headerOnlyField("Response-Signature", "response_signature")
+            .headerOnlyField("Response-Timestamp", "response_timestamp")
             .build(),
         BasicKycResult.class);
   }

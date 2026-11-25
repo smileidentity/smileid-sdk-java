@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Bumps the SDK version and dates the Unreleased changelog section.
 #
-# Usage: scripts/bump-version.sh <major|minor|patch>
+# Usage: scripts/bump-version.sh <major|minor|patch|X.Y.Z>
+#
+# Give a part to bump it, or an exact X.Y.Z (plain digits, no leading zeros,
+# strictly greater than the current version) to jump to it, for example when
+# this SDK skipped a release and must catch up with the shared version.
 #
 # Reads the current version from build.gradle.kts (the version release.yml
 # checks the tag against), then:
@@ -13,13 +17,13 @@
 #   - prints the new version
 #
 # It changes nothing and exits 1 if the Unreleased section is empty, the new
-# version already has a changelog entry, or a file is not in the expected
-# shape. Set BUMP_VERSION_DATE=YYYY-MM-DD to fix the date (used by the tests).
+# version already has a changelog entry, an exact version is malformed or not
+# greater than the current one, or a file is not in the expected shape. Set BUMP_VERSION_DATE=YYYY-MM-DD to fix the date (used by the tests).
 # Run it from the repository root.
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 <major|minor|patch>" >&2
+  echo "Usage: $0 <major|minor|patch|X.Y.Z>" >&2
   exit 2
 }
 
@@ -30,8 +34,13 @@ fail() {
 
 [ "$#" -eq 1 ] || usage
 part="$1"
+semver_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
 case "$part" in
   major | minor | patch) ;;
+  *[0-9]*)
+    [[ "$part" =~ $semver_re ]] \
+      || fail "'${part}' is not a valid version. Give major, minor, patch or X.Y.Z (digits only, no leading zeros)."
+    ;;
   *) usage ;;
 esac
 
@@ -59,6 +68,19 @@ case "$part" in
   major) next="$((major + 1)).0.0" ;;
   minor) next="${major}.$((minor + 1)).0" ;;
   patch) next="${major}.${minor}.$((patch + 1))" ;;
+  *)
+    next="$part"
+    IFS=. read -r next_major next_minor next_patch <<EOF
+$next
+EOF
+    if [ "$next_major" -gt "$major" ] \
+      || { [ "$next_major" -eq "$major" ] && [ "$next_minor" -gt "$minor" ]; } \
+      || { [ "$next_major" -eq "$major" ] && [ "$next_minor" -eq "$minor" ] && [ "$next_patch" -gt "$patch" ]; }; then
+      :
+    else
+      fail "version ${next} is not greater than the current version ${current}"
+    fi
+    ;;
 esac
 release_date="${BUMP_VERSION_DATE:-$(date -u +%Y-%m-%d)}"
 

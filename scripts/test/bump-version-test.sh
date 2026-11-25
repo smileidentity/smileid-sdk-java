@@ -145,6 +145,75 @@ else
   fail "major bump writes the changelog heading"
 fi
 
+# --- an exact version jumps straight to it and updates everything a part bump does
+setup
+if out="$(bump 13.1.0 2>&1)" && [ "$out" = "13.1.0" ]; then
+  pass "exact version prints the new version"
+else
+  fail "exact version prints the new version (got: $out)"
+fi
+remaining="$(
+  cd "$work"
+  grep -l '12\.2\.0' "${files[@]}" | grep -v CHANGELOG.md
+)" || true
+if [ -z "$remaining" ]; then
+  pass "exact version leaves no old version outside the changelog"
+else
+  fail "exact version left the old version in: $remaining"
+fi
+for f in "${files[@]}"; do
+  [ "$f" = CHANGELOG.md ] && continue
+  if grep -q '13\.1\.0' "${work}/${f}"; then
+    pass "exact version writes the new version to $f"
+  else
+    fail "exact version writes the new version to $f"
+  fi
+done
+if grep -q '^## \[13\.1\.0\] - 2026-11-09$' "${work}/CHANGELOG.md" \
+  && grep -qF '[Unreleased]: https://github.com/smileidentity/smileid-sdk-java/compare/v13.1.0...HEAD' "${work}/CHANGELOG.md" \
+  && grep -qF '[13.1.0]: https://github.com/smileidentity/smileid-sdk-java/compare/v12.2.0...v13.1.0' "${work}/CHANGELOG.md"; then
+  pass "exact version moves Unreleased under a dated heading and updates the links"
+else
+  fail "exact version moves Unreleased under a dated heading and updates the links"
+fi
+setup
+out="$(bump 12.2.1)"
+if [ "$out" = "12.2.1" ]; then pass "exact version 12.2.1 is accepted"; else fail "exact version 12.2.1 is accepted (got: $out)"; fi
+
+# --- an exact version that is not greater, or malformed, fails and changes nothing
+for v in 12.2.0 12.1.9 11.9.9; do
+  setup
+  before="$(cd "$work" && cat "${files[@]}" | cksum)"
+  if out="$(bump "$v" 2>&1)"; then
+    fail "exact version $v (not greater) fails"
+  elif [ "$(cd "$work" && cat "${files[@]}" | cksum)" != "$before" ]; then
+    fail "exact version $v (not greater) fails but changed files"
+  else
+    case "$out" in
+      *"not greater than the current version 12.2.0"*) pass "exact version $v (not greater) fails and changes no files" ;;
+      *) fail "exact version $v explains it is not greater (got: $out)" ;;
+    esac
+  fi
+done
+for v in 13.0 13.0.0.1 v13.0.0 13.01.0 13.0.0-rc1 " 13.0.0" 1x.0.0; do
+  setup
+  before="$(cd "$work" && cat "${files[@]}" | cksum)"
+  set +e
+  out="$(bump "$v" 2>&1)"
+  status=$?
+  set -e
+  if [ "$status" -ne 1 ]; then
+    fail "malformed version '$v' exits 1 (got $status)"
+  elif [ "$(cd "$work" && cat "${files[@]}" | cksum)" != "$before" ]; then
+    fail "malformed version '$v' fails but changed files"
+  else
+    case "$out" in
+      *"is not a valid version"*) pass "malformed version '$v' fails and changes no files" ;;
+      *) fail "malformed version '$v' explains the problem (got: $out)" ;;
+    esac
+  fi
+done
+
 # --- a file in the wrong shape stops the bump before anything changes
 setup
 sed 's/VERSION = "12.2.0";/VERSION = "9.9.9";/' "${work}/src/main/java/com/smileidentity/Version.java" \
